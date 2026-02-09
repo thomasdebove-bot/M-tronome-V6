@@ -32,7 +32,7 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 app = FastAPI(title="TEMPO • CR Synthèse (METRONOME)")
 
@@ -2222,8 +2222,8 @@ body{{padding:14px 14px 14px 280px;}}
 .coverHeroLogo{{height:110px;width:auto;display:block}}
 .coverNoteCenter{{text-align:center;padding:10px 16px 12px 16px;font-weight:900;display:flex;flex-direction:column;align-items:center;gap:10px}}
 .coverAppNote{{margin-top:8px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:14px;line-height:1.45;color:#f97316;font-style:italic;font-weight:600;max-width:640px}}
-.coverQr{{margin-top:6px;height:110px;width:auto;display:block}}
-@media print{{.coverQr{{display:block!important}}}}
+.coverUrl{{margin-top:6px;font-weight:900;color:#f97316;text-decoration:underline;text-underline-offset:3px}}
+.coverUrl::after{{content:" ↗";font-weight:900}}
 .coverProjectTitle{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#f59e0b;font-weight:700;letter-spacing:.5px;text-transform:uppercase}}
 .coverCrTitle{{margin-top:10px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#0f3a40;font-weight:700}}
 .coverCrMeta{{margin-top:8px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#0f3a40;font-weight:700}}
@@ -2438,9 +2438,6 @@ body{{padding:14px 14px 14px 280px;}}
     tempo_logo = _logo_data_url(LOGO_TEMPO_PATH)
     logo_rythme = _logo_data_url(LOGO_RYTHME_PATH)
     logo_tmark = _logo_data_url(LOGO_T_MARK_PATH)
-    qr_src = ""
-    if os.path.exists(os.path.normpath(LOGO_QR_PATH)):
-        qr_src = f"/asset/qr?v={int(_mtime(LOGO_QR_PATH))}"
     cover_html = ""
 
     next_meeting_date = (meet_date or ref_date) + timedelta(days=7)
@@ -2477,9 +2474,9 @@ body{{padding:14px 14px 14px 280px;}}
         <div class='coverAppNote'>
           Téléchargez gratuitement l’application de gestion de projet METRONOME. L’application développée par TEMPO
           dédiée à la gestion de projet. Celle-ci vous permettra de retrouver l’intégralité des réunions de synthèse, comptes rendu,
-          planning et suivi des tâches dans votre smartphone.
+          planning et suivi des tâches depuis votre smartphone ou votre ordinateur.
         </div>
-        {("<img class='coverQr' src='" + qr_src + "' alt='QR code METRONOME' loading='eager' decoding='sync' />") if qr_src else ""}
+        <a class='coverUrl' href='https://app.atelier-tempo.fr' target='_blank' rel='noopener'>app.atelier-tempo.fr</a>
       </div>
     """
 
@@ -2680,14 +2677,6 @@ def health():
         except Exception as e:
             data[k] = {"path": p, "exists": False, "error": str(e)}
     return {"ok": True, "files": data}
-
-
-@app.get("/asset/qr")
-def asset_qr():
-    path = os.path.normpath(LOGO_QR_PATH)
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="QR code not found")
-    return FileResponse(path)
 
 
 @app.get("/api/memos", response_class=JSONResponse)
