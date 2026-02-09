@@ -414,6 +414,29 @@ def _logo_data_url(path: str) -> str:
         return ""
 
 
+def _meeting_sequence_for_project(
+    meetings_df: pd.DataFrame, meeting_id: str
+) -> Tuple[int, int]:
+    if meetings_df.empty:
+        return 1, 1
+    df = meetings_df.copy()
+    df["__mid__"] = _series(df, M_COL_ID, "").fillna("").astype(str).str.strip()
+    df["__mdate__"] = _series(df, M_COL_DATE, None).apply(_parse_date_any)
+    df = df.loc[df["__mid__"] != ""].copy()
+    if df.empty:
+        return 1, 1
+    df = df.sort_values(by=["__mdate__", "__mid__"], ascending=[True, True])
+    ids = df["__mid__"].tolist()
+    total = len(ids)
+    if str(meeting_id) in ids:
+        index = ids.index(str(meeting_id)) + 1
+    else:
+        index = total
+    index = max(1, index)
+    total = max(1, total)
+    return index, total
+
+
 # -------------------------
 # IMAGES (robust)
 # -------------------------
@@ -1136,6 +1159,43 @@ RESIZE_COLUMNS_JS = r"""
 })();
 """
 
+SYNC_EDITABLE_JS = r"""
+(function(){
+  function syncAll(){
+    const groups = new Map();
+    document.querySelectorAll('[data-sync]').forEach(el => {
+      const key = el.getAttribute('data-sync') || '';
+      if(!key || groups.has(key)) return;
+      groups.set(key, el.textContent);
+    });
+    groups.forEach((value, key) => {
+      document.querySelectorAll(`[data-sync="${key}"]`).forEach(el => {
+        if(el.textContent !== value){ el.textContent = value; }
+      });
+    });
+  }
+
+  function syncValue(el){
+    const key = el.getAttribute('data-sync') || '';
+    if(!key) return;
+    const value = el.textContent;
+    document.querySelectorAll(`[data-sync="${key}"]`).forEach(target => {
+      if(target !== el){ target.textContent = value; }
+    });
+  }
+
+  document.addEventListener('input', (e) => {
+    const el = e.target.closest('[data-sync]');
+    if(el){ syncValue(el); }
+  });
+  document.addEventListener('blur', (e) => {
+    const el = e.target.closest('[data-sync]');
+    if(el){ syncValue(el); }
+  }, true);
+  window.addEventListener('DOMContentLoaded', syncAll);
+})();
+"""
+
 RANGE_PICKER_JS = r"""
 function toggleRangePanel(){
   const panel = document.getElementById('rangePanel');
@@ -1753,6 +1813,8 @@ def render_cr(
                 continue
             mdate = mr.get("__mdate__")
             meeting_date_by_id[mid] = mdate
+    meeting_index, meeting_total = _meeting_sequence_for_project(meetings_df, meeting_id)
+    cr_number_default = f"{meeting_index:02d}/{meeting_total:02d}"
 
     # Pinned memos across history (editor helper)
     pinned_df = pd.DataFrame()
@@ -2160,7 +2222,7 @@ body{{padding:14px 14px 14px 280px;}}
 .coverHeroLogo{{height:110px;width:auto;display:block}}
 .coverNoteCenter{{text-align:center;padding:10px 16px 12px 16px;font-weight:900;display:flex;flex-direction:column;align-items:center;gap:10px}}
 .coverAppNote{{margin-top:8px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:14px;line-height:1.45;color:#f97316;font-style:italic;font-weight:600;max-width:640px}}
-.coverQr{{margin-top:6px;height:110px;width:auto}}
+.coverQr{{margin-top:6px;height:110px;width:auto;display:block}}
 @media print{{.coverQr{{display:block!important}}}}
 .coverProjectTitle{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#f59e0b;font-weight:700;letter-spacing:.5px;text-transform:uppercase}}
 .coverCrTitle{{margin-top:10px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#0f3a40;font-weight:700}}
@@ -2334,7 +2396,8 @@ body{{padding:14px 14px 14px 280px;}}
 .annexTable td:last-child{{text-align:right}}
 .annexTable td:last-child .annexLink{{display:inline-block;text-align:right}}
 .annexTable th{{font-weight:900;background:#1f4e4f;color:#fff}}
-.annexTable .annexLink{{color:#f97316;font-weight:800;text-decoration:none}}
+.annexTable .annexLink{{color:#f97316;font-weight:800;text-decoration:underline;text-underline-offset:3px;cursor:pointer}}
+.annexTable .annexLink::after{{content:" ↗";font-weight:900;color:#f97316}}
 .annexTable tr:last-child td{{border-bottom:none}}
 .coverTable{{margin:10px 0 12px 0}}
 .coverTable td:first-child{{width:260px;color:#0b1220;font-weight:900}}
@@ -2397,13 +2460,13 @@ body{{padding:14px 14px 14px 280px;}}
         <div class='coverProjectTitle' contenteditable='true'>{_escape(project)}</div>
         <div class='coverCrTitle' contenteditable='true'>CR REUNION DE SYNTHESE TECHNIQUE</div>
         <div class='coverCrMeta'>
-          N°<span contenteditable='true' class='editInline'>06</span>
+          N°<span contenteditable='true' class='editInline' data-sync='cr-number'>{_escape(cr_number_default)}</span>
           du <strong>{_escape(cr_date_txt)}</strong>
         </div>
         <div class='nextMeetingBox'>
           <div class='nextMeetingLine1'>La prochaine réunion de synthèse est fixée au</div>
           <div class='nextMeetingLine2'>
-            <strong>{_escape(next_meeting_date_txt)}</strong>
+            <span contenteditable='true' class='editInline'>{_escape(next_meeting_date_txt)}</span>
             à
             <span contenteditable='true' class='editInline'>14h00</span>
           </div>
@@ -2414,13 +2477,13 @@ body{{padding:14px 14px 14px 280px;}}
           dédiée à la gestion de projet. Celle-ci vous permettra de retrouver l’intégralité des réunions de synthèse, comptes rendu,
           planning et suivi des tâches dans votre smartphone.
         </div>
-        {("<img class='coverQr' src='" + qr_logo + "' alt='QR code METRONOME' />") if qr_logo else ""}
+        {("<img class='coverQr' src='" + qr_logo + "' alt='QR code METRONOME' loading='eager' decoding='sync' />") if qr_logo else ""}
       </div>
     """
 
     report_header_html = f"""
       <div class='reportHeader printHeaderFixed'>
-        {_escape(project)} <span class='accent'>— Compte Rendu</span> n°<span contenteditable='true' class='editInline'>06</span> — Réunion de Synthèse du {_escape(cr_date_txt)}
+        {_escape(project)} <span class='accent'>— Compte Rendu</span> n°<span contenteditable='true' class='editInline' data-sync='cr-number'>{_escape(cr_number_default)}</span> — Réunion de Synthèse du {_escape(cr_date_txt)}
       </div>
     """
 
@@ -2552,6 +2615,7 @@ body{{padding:14px 14px 14px 280px;}}
 <script>{EDITOR_MEMO_MODAL_JS}</script>
 <script>{QUALITY_MODAL_JS}</script>
 <script>{ANALYSIS_MODAL_JS}</script>
+<script>{SYNC_EDITABLE_JS}</script>
 <script>{RANGE_PICKER_JS}</script>
 <script>{LAYOUT_CONTROLS_JS}</script>
 <script>{PAGINATION_JS}</script>
