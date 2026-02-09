@@ -312,7 +312,7 @@ def _parse_date_any(v) -> Optional[date]:
 
 
 def _fmt_date(d: Optional[date]) -> str:
-    return d.strftime("%d/%m/%y") if d else ""
+    return d.strftime("%d/%m/%Y") if d else ""
 
 
 def _norm_name(s: str) -> str:
