@@ -1813,8 +1813,8 @@ def render_cr(
                 continue
             mdate = mr.get("__mdate__")
             meeting_date_by_id[mid] = mdate
-    meeting_index, meeting_total = _meeting_sequence_for_project(meetings_df, meeting_id)
-    cr_number_default = f"{meeting_index:02d}/{meeting_total:02d}"
+    meeting_index, _meeting_total = _meeting_sequence_for_project(meetings_df, meeting_id)
+    cr_number_default = f"{meeting_index:02d}"
 
     # Pinned memos across history (editor helper)
     pinned_df = pd.DataFrame()
