@@ -32,7 +32,7 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 app = FastAPI(title="TEMPO • CR Synthèse (METRONOME)")
 
@@ -2438,7 +2438,9 @@ body{{padding:14px 14px 14px 280px;}}
     tempo_logo = _logo_data_url(LOGO_TEMPO_PATH)
     logo_rythme = _logo_data_url(LOGO_RYTHME_PATH)
     logo_tmark = _logo_data_url(LOGO_T_MARK_PATH)
-    qr_logo = _logo_data_url(LOGO_QR_PATH)
+    qr_src = ""
+    if os.path.exists(os.path.normpath(LOGO_QR_PATH)):
+        qr_src = f"/asset/qr?v={int(_mtime(LOGO_QR_PATH))}"
     cover_html = ""
 
     next_meeting_date = (meet_date or ref_date) + timedelta(days=7)
@@ -2477,7 +2479,7 @@ body{{padding:14px 14px 14px 280px;}}
           dédiée à la gestion de projet. Celle-ci vous permettra de retrouver l’intégralité des réunions de synthèse, comptes rendu,
           planning et suivi des tâches dans votre smartphone.
         </div>
-        {("<img class='coverQr' src='" + qr_logo + "' alt='QR code METRONOME' loading='eager' decoding='sync' />") if qr_logo else ""}
+        {("<img class='coverQr' src='" + qr_src + "' alt='QR code METRONOME' loading='eager' decoding='sync' />") if qr_src else ""}
       </div>
     """
 
@@ -2678,6 +2680,14 @@ def health():
         except Exception as e:
             data[k] = {"path": p, "exists": False, "error": str(e)}
     return {"ok": True, "files": data}
+
+
+@app.get("/asset/qr")
+def asset_qr():
+    path = os.path.normpath(LOGO_QR_PATH)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="QR code not found")
+    return FileResponse(path)
 
 
 @app.get("/api/memos", response_class=JSONResponse)
