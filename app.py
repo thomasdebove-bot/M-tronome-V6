@@ -1433,6 +1433,7 @@ PAGINATION_JS = r"""
         const available = calcAvailable(current, i === 0);
         const used = pageUsedHeight(current);
         const remaining = available - used;
+        if(remaining <= 0){ break; }
         if(used + candidateHeight <= available){
           currentBlocksWrap.appendChild(candidate);
           moved = true;
@@ -1442,11 +1443,14 @@ PAGINATION_JS = r"""
           const splitData = getZoneSplitData(candidate);
           if(splitData.rows.length > 1){
             const minimumChunk = splitData.titleHeight + splitData.tableOverhead + (splitData.rowHeights[0] || 0);
-            if(remaining > minimumChunk){
+            if(remaining >= minimumChunk){
               const {chunk, nextIndex, height: chunkHeight} = buildZoneChunk(candidate, splitData, 0, remaining);
-              if(nextIndex > 0 && nextIndex < splitData.rows.length && used + chunkHeight <= available){
+              if(nextIndex > 0 && used + chunkHeight <= available){
                 currentBlocksWrap.appendChild(chunk);
                 moved = true;
+                if(nextIndex >= splitData.rows.length){
+                  candidate.remove();
+                }
                 continue;
               }
             }
