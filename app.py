@@ -1656,6 +1656,7 @@ PAGINATION_JS = r"""
         final_html: finalHtml,
         project: (document.getElementById('project')?.value || document.body.dataset.project || '').trim(),
         filename: 'rapport.pdf',
+        meeting_id: (new URLSearchParams(window.location.search).get('meeting_id') || '').trim(),
       };
       const res = await fetch('/export/pdf', {
         method: 'POST',
@@ -1995,6 +1996,7 @@ def render_cr(
     meeting_id: str,
     project: str = "",
     print_mode: bool = False,
+    pdf_mode: bool = False,
     pinned_memos: str = "",
     range_start: str = "",
     range_end: str = "",
@@ -2957,6 +2959,7 @@ class ExportPdfPayload(BaseModel):
     meeting_date: str = ""
     report_number: str = ""
     filename: str = "rapport.pdf"
+    meeting_id: str = ""
 
 
 def _extract_print_content_from_cr_html(full_html: str) -> str:
@@ -3001,9 +3004,22 @@ def render_print_html(
       position: relative;
       overflow: visible;
     }
+    body[data-export="weasyprint"] .reportPages {
+      display: block !important;
+    }
+    body[data-export="weasyprint"] .page--report {
+      height: auto !important;
+      min-height: 0 !important;
+      break-after: auto !important;
+      page-break-after: auto !important;
+      overflow: visible !important;
+    }
     body[data-export="weasyprint"] .page .pageContent {
       padding-bottom: 28mm !important;
       box-sizing: border-box;
+    }
+    body[data-export="weasyprint"] .page--report .pageContent {
+      padding-bottom: 8mm !important;
     }
     body[data-export="weasyprint"] .page .docFooter {
       position: absolute !important;
@@ -3015,6 +3031,10 @@ def render_print_html(
       padding-left: 0 !important;
       padding-right: 0 !important;
       overflow: hidden;
+    }
+    body[data-export="weasyprint"] .page--report .docFooter {
+      position: static !important;
+      margin-top: 6mm !important;
     }
     body[data-export="weasyprint"] .page .docFooter::before,
     body[data-export="weasyprint"] .page .docFooter::after {
@@ -3170,7 +3190,22 @@ def export_pdf(
 ):
     try:
         source_css = ""
-        if payload and payload.final_html.strip():
+        payload_meeting_id = (payload.meeting_id or "").strip() if payload else ""
+        effective_meeting_id = (meeting_id or payload_meeting_id).strip()
+
+        if effective_meeting_id:
+            mrow = meeting_row(effective_meeting_id)
+            project_name = (project or str(mrow.get(M_COL_PROJECT_TITLE, ""))).strip()
+            meeting_date_txt = _fmt_date(_parse_date_any(mrow.get(M_COL_DATE)))
+            meetings_df = meetings_for_project(project_name)
+            report_index, report_total = _meeting_sequence_for_project(meetings_df, effective_meeting_id)
+            report_number = f"{report_index}/{report_total}"
+            source_html = render_cr(meeting_id=effective_meeting_id, project=project_name, print_mode=True)
+            source_css = _extract_styles_from_cr_html(source_html)
+            clean_content = _extract_print_content_from_cr_html(source_html)
+            safe_project = re.sub(r"[^A-Za-z0-9_-]+", "_", project_name).strip("_") or "projet"
+            filename = f"CR_{safe_project}_{effective_meeting_id}.pdf"
+        elif payload and payload.final_html.strip():
             project_name = (payload.project or project or "").strip()
             meeting_date_txt = (payload.meeting_date or "").strip()
             report_number = (payload.report_number or "").strip()
@@ -3184,18 +3219,6 @@ def export_pdf(
             report_number = (payload.report_number or "").strip()
             clean_content = payload.content_html.strip()
             filename = (payload.filename or "rapport.pdf").strip() or "rapport.pdf"
-        elif meeting_id:
-            mrow = meeting_row(meeting_id)
-            project_name = (project or str(mrow.get(M_COL_PROJECT_TITLE, ""))).strip()
-            meeting_date_txt = _fmt_date(_parse_date_any(mrow.get(M_COL_DATE)))
-            meetings_df = meetings_for_project(project_name)
-            report_index, report_total = _meeting_sequence_for_project(meetings_df, meeting_id)
-            report_number = f"{report_index}/{report_total}"
-            source_html = render_cr(meeting_id=meeting_id, project=project_name, print_mode=True)
-            source_css = _extract_styles_from_cr_html(source_html)
-            clean_content = _extract_print_content_from_cr_html(source_html)
-            safe_project = re.sub(r"[^A-Za-z0-9_-]+", "_", project_name).strip("_") or "projet"
-            filename = f"CR_{safe_project}_{meeting_id}.pdf"
         else:
             raise HTTPException(
                 status_code=400,
