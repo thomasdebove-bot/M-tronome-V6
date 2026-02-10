@@ -1284,10 +1284,6 @@ LAYOUT_CONTROLS_JS = r"""
 
 PAGINATION_JS = r"""
 (function(){
-  function isPrintMode(){
-    return document.body.classList.contains('printCssMode') || window.matchMedia('print').matches;
-  }
-
   function updatePageNumbers(){
     const pages = Array.from(document.querySelectorAll('.page'));
     const total = pages.length;
@@ -1313,7 +1309,7 @@ PAGINATION_JS = r"""
     if(blocksWrap && footer){
       const blocksTop = blocksWrap.getBoundingClientRect().top;
       const footerTop = footer.getBoundingClientRect().top;
-      return Math.max(0, footerTop - blocksTop - 2);
+      return Math.max(0, footerTop - blocksTop);
     }
     const pageContent = page.querySelector('.pageContent');
     const header = page.querySelector('.reportHeader');
@@ -1419,6 +1415,49 @@ PAGINATION_JS = r"""
   }
 
   function compactPages(container){
+    function mergeRowsIntoExistingZone(currentBlocksWrap, candidate, available, used){
+      if(!candidate.classList.contains('zoneBlock')) return false;
+      const zoneId = candidate.getAttribute('data-zone-id') || '';
+      if(!zoneId) return false;
+      const zones = Array.from(currentBlocksWrap.querySelectorAll('.zoneBlock'));
+      let targetZone = null;
+      for(let z=zones.length - 1; z>=0; z--){
+        const zone = zones[z];
+        if((zone.getAttribute('data-zone-id') || '') === zoneId){
+          targetZone = zone;
+          break;
+        }
+      }
+      if(!targetZone) return false;
+      const targetBody = targetZone.querySelector('tbody');
+      const sourceBody = candidate.querySelector('tbody');
+      if(!targetBody || !sourceBody) return false;
+
+      let projectedUsed = used;
+      let movedRows = 0;
+      const rows = Array.from(sourceBody.children);
+      for(let r=0; r<rows.length; r++){
+        const row = rows[r];
+        const rowHeight = row.getBoundingClientRect().height || row.offsetHeight || 0;
+        if(projectedUsed + rowHeight > available){ break; }
+        targetBody.appendChild(row);
+        projectedUsed += rowHeight;
+        movedRows += 1;
+      }
+
+      if(movedRows > 0){
+        const lastMoved = targetBody.lastElementChild;
+        if(lastMoved && lastMoved.classList.contains('sessionSubRow')){
+          sourceBody.insertBefore(lastMoved, sourceBody.firstChild);
+          movedRows -= 1;
+        }
+      }
+
+      if(movedRows <= 0) return false;
+      if(!sourceBody.firstElementChild){ candidate.remove(); }
+      return true;
+    }
+
     let pages = Array.from(container.querySelectorAll('.page--report'));
     let i = 0;
     while(i < pages.length - 1){
@@ -1430,16 +1469,41 @@ PAGINATION_JS = r"""
 
       let moved = false;
       let safety = 0;
-      while(nextBlocksWrap.firstElementChild && safety < 200){
+      while(nextBlocksWrap.firstElementChild && safety < 240){
         safety += 1;
         const candidate = nextBlocksWrap.firstElementChild;
         const candidateHeight = candidate.getBoundingClientRect().height || candidate.offsetHeight || 0;
         const available = calcAvailable(current, i === 0);
         const used = pageUsedHeight(current);
+        const remaining = available - used;
+        if(remaining <= 0){ break; }
+
+        if(mergeRowsIntoExistingZone(currentBlocksWrap, candidate, available, used)){
+          moved = true;
+          continue;
+        }
+
         if(used + candidateHeight <= available){
           currentBlocksWrap.appendChild(candidate);
           moved = true;
           continue;
+        }
+        if(candidate.classList.contains('zoneBlock')){
+          const splitData = getZoneSplitData(candidate);
+          if(splitData.rows.length > 1){
+            const minimumChunk = splitData.titleHeight + splitData.tableOverhead + (splitData.rowHeights[0] || 0);
+            if(remaining >= minimumChunk){
+              const {chunk, nextIndex, height: chunkHeight} = buildZoneChunk(candidate, splitData, 0, remaining);
+              if(nextIndex > 0 && used + chunkHeight <= available){
+                currentBlocksWrap.appendChild(chunk);
+                moved = true;
+                if(nextIndex >= splitData.rows.length){
+                  candidate.remove();
+                }
+                continue;
+              }
+            }
+          }
         }
         break;
       }
@@ -1457,7 +1521,6 @@ PAGINATION_JS = r"""
   }
 
   function paginate(){
-    if(isPrintMode()) return;
     const container = document.querySelector('.reportPages');
     const firstPage = container?.querySelector('.page--report');
     if(!container || !firstPage) return;
@@ -1484,7 +1547,7 @@ PAGINATION_JS = r"""
         let rowIndex = 0;
         while(rowIndex < splitData.rows.length){
           const remaining = available - used;
-          if(remaining <= splitData.titleHeight + splitData.tableOverhead && template && used > 0){
+          if(remaining < splitData.titleHeight + splitData.tableOverhead && template && used > 0){
             const clone = template.content.firstElementChild.cloneNode(true);
             container.appendChild(clone);
             currentPage = clone;
@@ -1529,9 +1592,6 @@ PAGINATION_JS = r"""
   window.repaginateReport = paginate;
   window.refreshPagination = function(options){
     if(!window.repaginateReport){ return; }
-    const forPrint = !!(options && options.forPrint);
-    const body = document.body;
-    if(forPrint && body){ body.classList.add('printModeSim'); }
     let runs = 0;
     const run = () => {
       window.repaginateReport();
@@ -1551,11 +1611,9 @@ PAGINATION_JS = r"""
     window.__repaginateTimer = setTimeout(paginate, 200);
   });
   window.addEventListener('beforeprint', () => {
-    document.body.classList.add('printCssMode');
+    window.refreshPagination && window.refreshPagination();
   });
   window.addEventListener('afterprint', () => {
-    document.body.classList.remove('printCssMode');
-    document.body.classList.remove('printModeSim');
     window.repaginateReport && window.repaginateReport();
   });
   window.addEventListener('DOMContentLoaded', updatePageNumbers);
@@ -2388,7 +2446,6 @@ body{{padding:14px 14px 14px 280px;}}
 .small{{font-size:12px}}
 .noPrint{{}}
 @media print{{ .noPrint{{display:none!important}} }}
-body.printCssMode .noPrint{{display:none!important}}
 @media print{{body{{padding:0;background:#fff}} .page{{margin:0;box-shadow:none}}}}
 @media screen{{body{{background:#e5e7eb;}} .page{{box-shadow:0 14px 30px rgba(15,23,42,.16)}}}}
 .topPage{{transform:scale(var(--top-scale));transform-origin:top left}}
@@ -2413,8 +2470,6 @@ body.printCssMode .noPrint{{display:none!important}}
 .nextMeetingLine1{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:18px}}
 .nextMeetingLine2{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:18px;color:#ef4444;margin-top:5px}}
 .nextMeetingLine3{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:18px;color:#111;margin-top:4px;outline:none}}
-@media print{{.coverHeroImg{{min-height:390px}} .coverProjectTitle{{font-size:44px}} .coverCrTitle{{font-size:33px}} .coverCrMeta{{font-size:36px}} .nextMeetingLine1{{font-size:18px}} .nextMeetingLine2{{font-size:32px}} .nextMeetingLine3{{font-size:27px}}}}
-
 /* PROJECT BANNER */
 .banner{{
   border:1px solid var(--border);
@@ -2430,8 +2485,6 @@ body.printCssMode .noPrint{{display:none!important}}
 .bannerMeta{{margin-top:10px;display:flex;flex-wrap:wrap;gap:10px}}
 .bannerChip{{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18);padding:7px 10px;border-radius:999px;font-weight:700;}}
 .bannerDesc{{margin-top:10px;opacity:.95}}
-@media print{{.bannerImg{{min-height:300px}} .bannerTitle{{font-size:22px}} .bannerContent{{padding:14px}}}}
-
 /* BANNER LOGO */
 .bannerLogoWrap{{display:flex;justify-content:flex-start;margin-bottom:8px}}
 .bannerLogo{{height:72px;width:auto;display:block}}
@@ -2444,8 +2497,6 @@ body.printCssMode .noPrint{{display:none!important}}
 .kpi_v{{font-weight:1000;font-size:20px;margin-top:6px}}
 .topGrip{{height:8px;width:120px;background:#e2e8f0;border-radius:999px;margin:8px auto 0;cursor:ns-resize}}
 @media (max-width: 980px){{.kpis{{grid-template-columns:repeat(3,1fr)}}}}
-@media print{{.kpis{{grid-template-columns:repeat(4,1fr);gap:6px}} .kpi{{padding:6px}} .kpi_v{{font-size:16px}}}}
-
 /* Sections */
 .section{{margin-top:18px}}
 .sectionTitle{{
@@ -2523,22 +2574,22 @@ body.printCssMode .noPrint{{display:none!important}}
 .kpiCount{{font-weight:1000}}
 
 /* PRINT TABLE */
-@page {{ size: A4 portrait; margin: 10mm 8mm 26mm 8mm; }}
+@page {{ size: A4 portrait; margin: 0; }}
 
 .zoneBlock{{margin:0}}
 .zoneBlock + .zoneBlock{{margin-top:0}}
 .reportBlocks{{display:flex;flex-direction:column;gap:0}}
-.reportBlock{{break-inside:avoid;page-break-inside:avoid}}
+.reportBlock{{break-inside:auto;page-break-inside:auto}}
 .reportNote{{margin-top:12px}}
 .crTable{{width:100%;border-collapse:collapse;table-layout:fixed;border:1px solid var(--border);margin-top:-1px;}}
 .crTable thead{{display:table-header-group}}
 .crTable tfoot{{display:table-footer-group}}
 .crTable th, .crTable td{{border:1px solid var(--border);padding:7px 8px;vertical-align:top;page-break-inside:avoid;break-inside:avoid;}}
-.crTable tr{{page-break-inside:avoid;break-inside:avoid;}}
-.annexTable tr{{page-break-inside:avoid;break-inside:avoid;}}
-.zoneBlock{{break-inside:avoid-page;page-break-inside:avoid;}}
-.zoneTitle{{break-after:avoid-page;page-break-after:avoid;}}
-.sessionSubRow{{break-after:avoid-page;page-break-after:avoid;}}
+.crTable tr{{page-break-inside:auto;break-inside:auto;}}
+.annexTable tr{{page-break-inside:auto;break-inside:auto;}}
+.zoneBlock{{break-inside:auto;page-break-inside:auto;}}
+.zoneTitle{{break-after:auto;page-break-after:auto;}}
+.sessionSubRow{{break-after:auto;page-break-after:auto;}}
 .crTable th{{background:#1f4e4f;color:#fff;text-align:center;font-weight:900;font-size:11px;line-height:1.2;white-space:nowrap}}
 .crTable td{{font-size:11px;line-height:1.3;word-break:normal;overflow-wrap:break-word;hyphens:none}}
 .crTable td.colDate, .crTable th.colDate{{padding:6px 4px}}
@@ -2597,35 +2648,26 @@ body.printCssMode .noPrint{{display:none!important}}
 .coverNote{{margin-top:12px;border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff;line-height:1.5}}
 .coverNoteTitle{{font-weight:1000;margin-bottom:6px}}
 .reportHeader{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:11px;font-weight:400;color:#0b1220;text-align:center;margin:0 0 10px 0;}}
-@media print{{
-  .printHeaderFixed{{position:static!important;top:auto;left:auto;right:auto;padding:0;z-index:auto;}}
-  .page--cover .printHeaderFixed{{display:none!important;}}
-  body.printCssMode .page--report .printHeaderFixed{{position:sticky!important;top:0;background:#fff;padding:1mm 0;z-index:20;display:block!important;}}
-}}
 .reportHeader .accent{{color:#f59e0b;font-weight:900}}
 .presenceTable .presenceList{{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}}
 .presenceTable .presenceLine{{display:flex;align-items:center;gap:8px;font-weight:700}}
-.docFooter{{position:absolute;left:0;right:0;bottom:0;height:24mm;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:3mm 10mm;border-top:1px solid #dbe5f0;background:#fff;overflow:hidden;width:100%;box-sizing:border-box}}
+.docFooter{{position:absolute;left:0;right:0;bottom:0;height:24mm;display:flex;align-items:center;justify-content:center;gap:10px;padding:3mm 10mm;border-top:1px solid #dbe5f0;background:#fff;overflow:hidden;width:100%;box-sizing:border-box}}
 .docFooter::before{{content:"";position:absolute;left:0;bottom:0;width:170px;height:42px;background:#123f45;clip-path:polygon(0 100%,100% 100%,0 0)}}
 .docFooter::after{{content:"";position:absolute;right:0;bottom:0;width:260px;height:70px;background:#123f45;clip-path:polygon(100% 0,100% 100%,0 100%)}}
 .footLeft,.footCenter,.footRight{{position:relative;z-index:2}}
-.footRight{{min-width:42mm;text-align:right;color:#ffffff;font-size:10px;font-weight:700;align-self:flex-end;padding-bottom:1mm}}
-.footCenter{{text-align:center;flex:1}}
+.footLeft,.footRight{{flex:0 0 42mm;display:flex;align-items:flex-end}}
+.footLeft{{justify-content:flex-start}}
+.footRight{{justify-content:flex-end;text-align:right;color:#ffffff;font-size:10px;font-weight:700;padding-bottom:1mm}}
+.footCenter{{text-align:center;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:120mm;margin:0 auto}}
 .tempoLegal{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:10px;line-height:1.3;color:#6b7280;font-weight:600}}
 .footImg{{display:block;max-height:32px;width:auto}}
 .footMark{{max-height:48px}}
 .footRythme{{max-height:28px;margin:6px auto 0 auto}}
 .footTempo{{max-height:28px;margin-left:auto}}
 @media print{{
-  body{{padding:0}}
+  body{{padding:0;background:#fff}}
   .actions,.rangePanel{{display:none!important}}
-  body.printCssMode .reportPages{{display:block}}
-  body.printCssMode .page--report{{height:297mm!important;min-height:297mm!important;overflow:hidden!important;break-after:page!important;page-break-after:always!important;}}
-  body.printCssMode .page--report:last-child{{break-after:auto!important;page-break-after:auto!important;}}
-  body.printCssMode .page--report .pageContent{{padding:10mm 8mm 24mm 8mm!important;}}
-  body.printCssMode .page--report .docFooter{{position:absolute;left:0;right:0;bottom:0;}}
-  .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;overflow:hidden;break-after:page;page-break-after:always;}}
-  .page:last-child{{break-after:auto;page-break-after:auto;}}
+  .page{{margin:0;box-shadow:none;overflow:visible}}
 }}
 
 {EDITOR_MEMO_MODAL_CSS}
