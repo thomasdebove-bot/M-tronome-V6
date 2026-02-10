@@ -1459,8 +1459,9 @@ PAGINATION_JS = r"""
     }
   }
 
-  function paginate(){
-    if(isPrintMode()) return;
+  function paginate(force){
+    const forced = !!force;
+    if(!forced && isPrintMode()) return;
     const container = document.querySelector('.reportPages');
     const firstPage = container?.querySelector('.page--report');
     if(!container || !firstPage) return;
@@ -1530,21 +1531,23 @@ PAGINATION_JS = r"""
   }
 
   window.repaginateReport = paginate;
+  window.repaginateReportForce = () => paginate(true);
   window.refreshPagination = function(options){
     if(!window.repaginateReport){ return; }
     const forPrint = !!(options && options.forPrint);
+    const force = !!(options && options.force);
     const body = document.body;
     if(forPrint && body){ body.classList.add('printModeSim'); }
     let runs = 0;
     const run = () => {
-      window.repaginateReport();
+      window.repaginateReport(force);
       runs += 1;
       if(runs < 5){ requestAnimationFrame(run); }
     };
     requestAnimationFrame(run);
-    setTimeout(() => window.repaginateReport(), 120);
-    setTimeout(() => window.repaginateReport(), 260);
-    setTimeout(() => window.repaginateReport(), 480);
+    setTimeout(() => window.repaginateReport(force), 120);
+    setTimeout(() => window.repaginateReport(force), 260);
+    setTimeout(() => window.repaginateReport(force), 480);
   };
   window.addEventListener('load', () => {
     requestAnimationFrame(paginate);
@@ -1564,11 +1567,14 @@ PAGINATION_JS = r"""
   window.exportCurrentPdf = async function(){
     try{
       if(window.refreshPagination){
-        window.refreshPagination();
-        await new Promise((resolve) => setTimeout(resolve, 450));
+        window.refreshPagination({force:true});
+        await new Promise((resolve) => setTimeout(resolve, 650));
       }
-      if(window.repaginateReport){
-        window.repaginateReport();
+      if(window.repaginateReportForce){
+        window.repaginateReportForce();
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      }else if(window.repaginateReport){
+        window.repaginateReport(true);
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       }
       const finalHtml = document.documentElement.outerHTML || '';
