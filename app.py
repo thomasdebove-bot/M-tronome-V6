@@ -232,6 +232,16 @@ def _escape(s) -> str:
     )
 
 
+def _format_bulleted_text(value) -> str:
+    escaped = _escape(value)
+    if not escaped:
+        return ""
+    escaped = escaped.replace("\r\n", "\n").replace("\r", "\n")
+    escaped = escaped.replace("\n", "<br>")
+    escaped = re.sub(r"\s+([•-])\s+", r"<br>\1 ", escaped)
+    return escaped
+
+
 def _series(df: pd.DataFrame, col: str, default) -> pd.Series:
     if col in df.columns:
         data = df[col]
@@ -414,6 +424,29 @@ def _logo_data_url(path: str) -> str:
         return ""
 
 
+def _meeting_sequence_for_project(
+    meetings_df: pd.DataFrame, meeting_id: str
+) -> Tuple[int, int]:
+    if meetings_df.empty:
+        return 1, 1
+    df = meetings_df.copy()
+    df["__mid__"] = _series(df, M_COL_ID, "").fillna("").astype(str).str.strip()
+    df["__mdate__"] = _series(df, M_COL_DATE, None).apply(_parse_date_any)
+    df = df.loc[df["__mid__"] != ""].copy()
+    if df.empty:
+        return 1, 1
+    df = df.sort_values(by=["__mdate__", "__mid__"], ascending=[True, True])
+    ids = df["__mid__"].tolist()
+    total = len(ids)
+    if str(meeting_id) in ids:
+        index = ids.index(str(meeting_id)) + 1
+    else:
+        index = total
+    index = max(1, index)
+    total = max(1, total)
+    return index, total
+
+
 # -------------------------
 # IMAGES (robust)
 # -------------------------
@@ -490,7 +523,7 @@ def render_task_comment(r) -> str:
         return ""
     author = _escape(r.get(E_COL_TASK_COMMENT_AUTHOR, ""))
     d = _fmt_date(_parse_date_any(r.get(E_COL_TASK_COMMENT_DATE)))
-    body = _escape(txt).replace("\n", "<br>")
+    body = _format_bulleted_text(txt)
     meta = " • ".join([x for x in [author, d] if x])
     return f"""
       <div class="topicComment">
@@ -510,7 +543,7 @@ def render_entry_comment(r) -> str:
     author = _escape(r.get(E_COL_TASK_COMMENT_AUTHOR, ""))
     d = _fmt_date(_parse_date_any(r.get(E_COL_TASK_COMMENT_DATE)))
     company = _escape(r.get(E_COL_COMPANY_TASK, ""))
-    body = _escape(txt).replace("\n", "<br>")
+    body = _format_bulleted_text(txt)
     meta = " • ".join([x for x in [author, company, d] if x])
     return f"""
       <div class="entryComment">
@@ -1136,6 +1169,43 @@ RESIZE_COLUMNS_JS = r"""
 })();
 """
 
+SYNC_EDITABLE_JS = r"""
+(function(){
+  function syncAll(){
+    const groups = new Map();
+    document.querySelectorAll('[data-sync]').forEach(el => {
+      const key = el.getAttribute('data-sync') || '';
+      if(!key || groups.has(key)) return;
+      groups.set(key, el.textContent);
+    });
+    groups.forEach((value, key) => {
+      document.querySelectorAll(`[data-sync="${key}"]`).forEach(el => {
+        if(el.textContent !== value){ el.textContent = value; }
+      });
+    });
+  }
+
+  function syncValue(el){
+    const key = el.getAttribute('data-sync') || '';
+    if(!key) return;
+    const value = el.textContent;
+    document.querySelectorAll(`[data-sync="${key}"]`).forEach(target => {
+      if(target !== el){ target.textContent = value; }
+    });
+  }
+
+  document.addEventListener('input', (e) => {
+    const el = e.target.closest('[data-sync]');
+    if(el){ syncValue(el); }
+  });
+  document.addEventListener('blur', (e) => {
+    const el = e.target.closest('[data-sync]');
+    if(el){ syncValue(el); }
+  }, true);
+  window.addEventListener('DOMContentLoaded', syncAll);
+})();
+"""
+
 RANGE_PICKER_JS = r"""
 function toggleRangePanel(){
   const panel = document.getElementById('rangePanel');
@@ -1214,21 +1284,44 @@ LAYOUT_CONTROLS_JS = r"""
 
 PAGINATION_JS = r"""
 (function(){
+  function isPrintMode(){
+    return document.body.classList.contains('printCssMode') || window.matchMedia('print').matches;
+  }
+
+  function updatePageNumbers(){
+    const pages = Array.from(document.querySelectorAll('.page'));
+    const total = pages.length;
+    pages.forEach((page, idx) => {
+      const slot = page.querySelector('.footRight');
+      if(!slot) return;
+      if(page.classList.contains('page--cover')){
+        slot.textContent = '';
+        return;
+      }
+      slot.textContent = `${idx + 1}/${total}`;
+    });
+  }
+
   function px(value){
     const n = parseFloat(value || "0");
     return Number.isNaN(n) ? 0 : n;
   }
 
   function calcAvailable(page, includePresence){
-    const pageContent = page.querySelector('.pageContent');
+    const blocksWrap = page.querySelector('.reportBlocks');
     const footer = page.querySelector('.docFooter');
+    if(blocksWrap && footer){
+      const blocksTop = blocksWrap.getBoundingClientRect().top;
+      const footerTop = footer.getBoundingClientRect().top;
+      return Math.max(0, footerTop - blocksTop - 2);
+    }
+    const pageContent = page.querySelector('.pageContent');
     const header = page.querySelector('.reportHeader');
     const presence = page.querySelector('.presenceWrap');
     const pageRect = page.getBoundingClientRect();
     if(!pageContent) return pageRect.height;
     const styles = window.getComputedStyle(pageContent);
     let available = pageRect.height - px(styles.paddingTop) - px(styles.paddingBottom);
-    if(footer){ available -= footer.getBoundingClientRect().height; }
     if(header){ available -= header.getBoundingClientRect().height; }
     if(includePresence && presence){ available -= presence.getBoundingClientRect().height; }
     return available;
@@ -1243,7 +1336,10 @@ PAGINATION_JS = r"""
     const zones = Array.from(container.querySelectorAll('.zoneBlock'));
     const grouped = new Map();
     zones.forEach(zone => {
-      const key = zone.getAttribute('data-zone-id') || '';
+      const idKey = (zone.getAttribute('data-zone-id') || '').trim().toLowerCase();
+      const titleKey = (zone.querySelector('.zoneTitle')?.textContent || '').trim().toLowerCase();
+      const key = idKey || titleKey;
+      if(!key){ return; }
       if(!grouped.has(key)){ grouped.set(key, []); }
       grouped.get(key).push(zone);
     });
@@ -1294,12 +1390,6 @@ PAGINATION_JS = r"""
       endIndex += 1;
       if(endIndex === startIndex + 1 && height > maxHeight){ break; }
     }
-    if(endIndex > startIndex && rows[endIndex - 1]?.classList.contains('sessionSubRow')){
-      endIndex -= 1;
-    }
-    if(endIndex === startIndex && rows[startIndex]?.classList.contains('sessionSubRow') && startIndex + 1 < total){
-      endIndex = Math.min(startIndex + 2, total);
-    }
     height = titleHeight + tableOverhead;
     for(let i=startIndex;i<endIndex;i++){
       height += rowHeights[i] || 0;
@@ -1312,7 +1402,59 @@ PAGINATION_JS = r"""
     return {chunk, nextIndex: endIndex, height};
   }
 
+  function pageBlocks(page){
+    const wrap = page?.querySelector('.reportBlocks');
+    if(!wrap) return [];
+    return Array.from(wrap.children);
+  }
+
+  function pageUsedHeight(page){
+    return pageBlocks(page).reduce((sum, block) => {
+      const h = block.getBoundingClientRect().height || block.offsetHeight || 0;
+      return sum + h;
+    }, 0);
+  }
+
+  function compactPages(container){
+    let pages = Array.from(container.querySelectorAll('.page--report'));
+    let i = 0;
+    while(i < pages.length - 1){
+      const current = pages[i];
+      const next = pages[i + 1];
+      const currentBlocksWrap = current.querySelector('.reportBlocks');
+      const nextBlocksWrap = next.querySelector('.reportBlocks');
+      if(!currentBlocksWrap || !nextBlocksWrap){ i += 1; continue; }
+
+      let moved = false;
+      let safety = 0;
+      while(nextBlocksWrap.firstElementChild && safety < 200){
+        safety += 1;
+        const candidate = nextBlocksWrap.firstElementChild;
+        const candidateHeight = candidate.getBoundingClientRect().height || candidate.offsetHeight || 0;
+        const available = calcAvailable(current, i === 0);
+        const used = pageUsedHeight(current);
+        if(used + candidateHeight <= available){
+          currentBlocksWrap.appendChild(candidate);
+          moved = true;
+          continue;
+        }
+        break;
+      }
+
+      if(!nextBlocksWrap.firstElementChild){
+        next.remove();
+        pages = Array.from(container.querySelectorAll('.page--report'));
+        continue;
+      }
+      i += 1;
+      if(moved){
+        pages = Array.from(container.querySelectorAll('.page--report'));
+      }
+    }
+  }
+
   function paginate(){
+    if(isPrintMode()) return;
     const container = document.querySelector('.reportPages');
     const firstPage = container?.querySelector('.page--report');
     if(!container || !firstPage) return;
@@ -1376,12 +1518,27 @@ PAGINATION_JS = r"""
       const actualHeight = node.getBoundingClientRect().height || height;
       used += actualHeight;
     });
+
+    compactPages(container);
+    updatePageNumbers();
   }
 
   window.repaginateReport = paginate;
-  window.refreshPagination = function(){
+  window.refreshPagination = function(options){
     if(!window.repaginateReport){ return; }
-    requestAnimationFrame(() => window.repaginateReport());
+    const forPrint = !!(options && options.forPrint);
+    const body = document.body;
+    if(forPrint && body){ body.classList.add('printModeSim'); }
+    let runs = 0;
+    const run = () => {
+      window.repaginateReport();
+      runs += 1;
+      if(runs < 5){ requestAnimationFrame(run); }
+    };
+    requestAnimationFrame(run);
+    setTimeout(() => window.repaginateReport(), 120);
+    setTimeout(() => window.repaginateReport(), 260);
+    setTimeout(() => window.repaginateReport(), 480);
   };
   window.addEventListener('load', () => {
     requestAnimationFrame(paginate);
@@ -1390,6 +1547,15 @@ PAGINATION_JS = r"""
     clearTimeout(window.__repaginateTimer);
     window.__repaginateTimer = setTimeout(paginate, 200);
   });
+  window.addEventListener('beforeprint', () => {
+    document.body.classList.add('printCssMode');
+  });
+  window.addEventListener('afterprint', () => {
+    document.body.classList.remove('printCssMode');
+    document.body.classList.remove('printModeSim');
+    window.repaginateReport && window.repaginateReport();
+  });
+  window.addEventListener('DOMContentLoaded', updatePageNumbers);
 })();
 """
 
@@ -1477,6 +1643,66 @@ ROW_CONTROL_JS = r"""
 
   syncSessionHeaders();
   syncZoneVisibility();
+})();
+"""
+
+ROW_IMAGE_JS = r"""
+(function(){
+  function repaginate(){
+    if(window.repaginateReport){ window.repaginateReport(); }
+  }
+
+  function bindFrameResize(frame){
+    if(!frame) return;
+    frame.addEventListener('mouseup', repaginate);
+    frame.addEventListener('touchend', repaginate);
+  }
+
+  function addImage(rowId, src){
+    const box = document.querySelector(`[data-row-image-box="${rowId}"]`);
+    if(!box) return;
+    const frame = document.createElement('div');
+    frame.className = 'rowCustomImageFrame';
+    frame.innerHTML = `
+      <button class="rowCustomImageRemove noPrint" type="button" title="Retirer l'image">×</button>
+      <img class="rowCustomImageEl" src="${src}" alt="Image ajoutée" />
+    `;
+    box.appendChild(frame);
+    bindFrameResize(frame);
+    const img = frame.querySelector('img');
+    if(img){ img.addEventListener('load', repaginate, {once:true}); }
+    repaginate();
+  }
+
+  document.addEventListener('click', (e) => {
+    const addBtn = e.target.closest('[data-row-image-add]');
+    if(addBtn){
+      const rowId = addBtn.getAttribute('data-row-image-add') || '';
+      const input = document.querySelector(`[data-row-image-input="${rowId}"]`);
+      if(input){ input.click(); }
+      return;
+    }
+    const removeSingle = e.target.closest('.rowCustomImageRemove');
+    if(removeSingle){
+      const frame = removeSingle.closest('.rowCustomImageFrame');
+      if(frame){
+        frame.remove();
+        repaginate();
+      }
+    }
+  });
+
+  document.addEventListener('change', (e) => {
+    const input = e.target.closest('[data-row-image-input]');
+    if(!input || !input.files || !input.files.length) return;
+    const rowId = input.getAttribute('data-row-image-input') || '';
+    Array.from(input.files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => addImage(rowId, String(reader.result || ''));
+      reader.readAsDataURL(file);
+    });
+    input.value = '';
+  });
 })();
 """
 
@@ -1753,6 +1979,8 @@ def render_cr(
                 continue
             mdate = mr.get("__mdate__")
             meeting_date_by_id[mid] = mdate
+    meeting_index, _meeting_total = _meeting_sequence_for_project(meetings_df, meeting_id)
+    cr_number_default = f"{meeting_index:02d}"
 
     # Pinned memos across history (editor helper)
     pinned_df = pd.DataFrame()
@@ -1834,7 +2062,7 @@ def render_cr(
 
     # Card renderer for tasks outside the meeting (rappels / à-suivre) — NO BADGES
     def render_task_card_from_row(r, tag: str, extra_class: str, img_col: Optional[str]) -> str:
-        title = _escape(r.get(E_COL_TITLE, ""))
+        title = _format_bulleted_text(r.get(E_COL_TITLE, ""))
         company = _escape(r.get(E_COL_COMPANY_TASK, ""))
         owner = _escape(r.get(E_COL_OWNER, ""))
         deadline = _fmt_date(_parse_date_any(r.get(E_COL_DEADLINE)))
@@ -1889,7 +2117,7 @@ def render_cr(
         reminder_closed: bool = False,
         row_id: str = "",
     ) -> str:
-        title = _escape(r.get(E_COL_TITLE, ""))
+        title = _format_bulleted_text(r.get(E_COL_TITLE, ""))
         company = _escape(r.get(E_COL_COMPANY_TASK, ""))
         packages = _escape(r.get(E_COL_PACKAGES, ""))
         concerne_display = _concerne_trigram(company)
@@ -1932,12 +2160,20 @@ def render_cr(
 
         safe_row_id = _escape(row_id) or _escape(str(r.get(E_COL_ID, "")))
         toggle_html = f"<input type='checkbox' class='rowToggle noPrint' data-target='{safe_row_id}' checked />"
+        image_controls = f"""
+          <div class='rowImageTools noPrint'>
+            <button class='rowImageBtn' type='button' data-row-image-add='{safe_row_id}'>+ Image</button>
+            <input class='rowImageInput' type='file' accept='image/*' multiple data-row-image-input='{safe_row_id}' />
+          </div>
+          <div class='rowCustomImage' data-row-image-box='{safe_row_id}'></div>
+        """
         return f"""
           <tr class="{row_cls}" data-row-id="{safe_row_id}">
             <td class="colType">{toggle_html}<div>{tag_html or "—"}</div></td>
             <td class="colComment">
               <div class="commentText">{title}</div>
               {thumbs}
+              {image_controls}
               {render_entry_comment(r)}
             </td>
             <td class="colDate">{created or "—"}</td>
@@ -1964,7 +2200,7 @@ def render_cr(
         else:
             d = created_d
         if d:
-            return d, f"En séance du {d.strftime('%d/%m/%Y')} :"
+            return d, f"En séance du {d.strftime('%d/%m/%y')} :"
         return None, "Hors séance :"
 
     def render_zone_table(area_name: str, rows_html: str) -> str:
@@ -2014,7 +2250,7 @@ def render_cr(
     zones_html_parts: List[str] = []
 
     current_session_label = (
-        f"En séance du {(meet_date or ref_date).strftime('%d/%m/%Y')} :" if (meet_date or ref_date) else ""
+        f"En séance du {(meet_date or ref_date).strftime('%d/%m/%y')} :" if (meet_date or ref_date) else ""
     )
 
     for area_name, g in areas:
@@ -2139,14 +2375,17 @@ def render_cr(
 html,body{{margin:0;padding:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
 body{{padding:14px 14px 14px 280px;}}
 .wrap{{display:flex;flex-direction:column;gap:12px;align-items:center;}}
+.reportPages{{counter-reset:reportpage;}}
 .page{{width:210mm;height:297mm;min-height:297mm;position:relative;background:#fff;overflow:visible;break-after:page;page-break-after:always;}}
 .page:last-child{{break-after:auto;page-break-after:auto;}}
+.page--report{{counter-increment:reportpage;}}
 .pageContent{{padding:10mm 8mm 34mm 8mm;}}
 .page--cover .pageContent{{padding-top:0;}}
 .muted{{color:var(--muted)}}
 .small{{font-size:12px}}
 .noPrint{{}}
 @media print{{ .noPrint{{display:none!important}} }}
+body.printCssMode .noPrint{{display:none!important}}
 @media print{{body{{padding:0;background:#fff}} .page{{margin:0;box-shadow:none}}}}
 @media screen{{body{{background:#e5e7eb;}} .page{{box-shadow:0 14px 30px rgba(15,23,42,.16)}}}}
 .topPage{{transform:scale(var(--top-scale));transform-origin:top left}}
@@ -2159,9 +2398,9 @@ body{{padding:14px 14px 14px 280px;}}
 .coverHeroLogoWrap{{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:4;background:#fff;padding:10px 18px;border-radius:8px;box-shadow:0 6px 18px rgba(2,6,23,.12)}}
 .coverHeroLogo{{height:110px;width:auto;display:block}}
 .coverNoteCenter{{text-align:center;padding:10px 16px 12px 16px;font-weight:900;display:flex;flex-direction:column;align-items:center;gap:10px}}
-.coverAppNote{{margin-top:8px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:14px;line-height:1.45;color:#f97316;font-style:italic;font-weight:600;max-width:640px}}
-.coverQr{{margin-top:6px;height:110px;width:auto}}
-@media print{{.coverQr{{display:block!important}}}}
+.coverAppNote{{margin-top:22px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:14px;line-height:1.45;color:#f97316;font-style:italic;font-weight:600;max-width:640px}}
+.coverUrl{{margin-top:12px;font-weight:900;color:#f97316;text-decoration:underline;text-underline-offset:3px}}
+.coverUrl::after{{content:" ↗";font-weight:900}}
 .coverProjectTitle{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#f59e0b;font-weight:700;letter-spacing:.5px;text-transform:uppercase}}
 .coverCrTitle{{margin-top:10px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#0f3a40;font-weight:700}}
 .coverCrMeta{{margin-top:8px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#0f3a40;font-weight:700}}
@@ -2281,12 +2520,11 @@ body{{padding:14px 14px 14px 280px;}}
 .kpiCount{{font-weight:1000}}
 
 /* PRINT TABLE */
-@page {{ size: A4 portrait; margin: 0; }}
+@page {{ size: A4 portrait; margin: 10mm 8mm 26mm 8mm; }}
 
 .zoneBlock{{margin:0}}
 .zoneBlock + .zoneBlock{{margin-top:0}}
 .reportBlocks{{display:flex;flex-direction:column;gap:0}}
-.reportBlock{{break-inside:avoid;page-break-inside:avoid}}
 .reportNote{{margin-top:12px}}
 .crTable{{width:100%;border-collapse:collapse;table-layout:fixed;border:1px solid var(--border);margin-top:-1px;}}
 .crTable thead{{display:table-header-group}}
@@ -2315,13 +2553,20 @@ body{{padding:14px 14px 14px 280px;}}
 .colGrip{{position:absolute;top:0;right:-6px;width:12px;height:100%;cursor:col-resize}}
 .colGrip::after{{content:"";position:absolute;top:3px;bottom:3px;left:5px;width:2px;background:#cbd5f5;border-radius:2px;opacity:.7}}
 
-@media print{{ .rowToggle{{display:none}} .noPrintRow{{display:none}} .editableCell{{background:transparent}} }}
+@media print{{ .rowToggle{{display:none}} .noPrintRow{{display:none}} .editableCell{{background:transparent}} .rowImageTools{{display:none!important}} .rowCustomImageFrame{{resize:none!important;border:none!important;padding:0!important;min-width:0!important;min-height:0!important;overflow:hidden!important}} }}
 
 .crTable tr.rowMeeting td{{background:#eef8ff;}}
 .crTable tr.rowMeeting td.colType{{box-shadow:inset 4px 0 0 #2563eb;}}
 
 .thumbs{{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}}
 .thumb{{height:90px;width:auto;border:1px solid var(--border);border-radius:8px;display:block}}
+.rowImageTools{{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}}
+.rowImageBtn{{padding:3px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer}}
+.rowImageInput{{display:none}}
+.rowCustomImage{{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}}
+.rowCustomImageFrame{{position:relative;display:inline-block;resize:both;overflow:auto;min-width:120px;min-height:80px;max-width:100%;border:1px dashed #94a3b8;border-radius:8px;background:#fff;padding:4px}}
+.rowCustomImageEl{{display:block;width:100%;height:100%;min-width:110px;min-height:70px;object-fit:contain;border-radius:6px}}
+.rowCustomImageRemove{{position:absolute;top:4px;right:4px;width:20px;height:20px;border:none;border-radius:999px;background:#111827;color:#fff;font-size:14px;line-height:20px;cursor:pointer;opacity:.88}}
 .entryComment{{margin-top:8px;padding-left:12px;border-left:3px solid #e2e8f0}}
 .tagReminderGreen{{color:#16a34a;font-weight:900}}
 .thumbA{{display:inline-flex}}
@@ -2334,7 +2579,8 @@ body{{padding:14px 14px 14px 280px;}}
 .annexTable td:last-child{{text-align:right}}
 .annexTable td:last-child .annexLink{{display:inline-block;text-align:right}}
 .annexTable th{{font-weight:900;background:#1f4e4f;color:#fff}}
-.annexTable .annexLink{{color:#f97316;font-weight:800;text-decoration:none}}
+.annexTable .annexLink{{color:#f97316;font-weight:800;text-decoration:underline;text-underline-offset:3px;cursor:pointer}}
+.annexTable .annexLink::after{{content:" ↗";font-weight:900;color:#f97316}}
 .annexTable tr:last-child td{{border-bottom:none}}
 .coverTable{{margin:10px 0 12px 0}}
 .coverTable td:first-child{{width:260px;color:#0b1220;font-weight:900}}
@@ -2344,7 +2590,11 @@ body{{padding:14px 14px 14px 280px;}}
 .coverNote{{margin-top:12px;border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff;line-height:1.5}}
 .coverNoteTitle{{font-weight:1000;margin-bottom:6px}}
 .reportHeader{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:11px;font-weight:400;color:#0b1220;text-align:center;margin:0 0 10px 0;}}
-@media print{{.printHeaderFixed{{position:sticky;top:0;background:#fff;padding:1mm 0;z-index:20;}}}}
+@media print{{
+  .printHeaderFixed{{position:static!important;top:auto;left:auto;right:auto;padding:0;z-index:auto;}}
+  .page--cover .printHeaderFixed{{display:none!important;}}
+  body.printCssMode .page--report .printHeaderFixed{{position:sticky!important;top:0;background:#fff;padding:1mm 0;z-index:20;display:block!important;}}
+}}
 .reportHeader .accent{{color:#f59e0b;font-weight:900}}
 .presenceTable .presenceList{{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}}
 .presenceTable .presenceLine{{display:flex;align-items:center;gap:8px;font-weight:700}}
@@ -2352,13 +2602,24 @@ body{{padding:14px 14px 14px 280px;}}
 .docFooter::before{{content:"";position:absolute;left:0;bottom:0;width:170px;height:42px;background:#123f45;clip-path:polygon(0 100%,100% 100%,0 0)}}
 .docFooter::after{{content:"";position:absolute;right:0;bottom:0;width:260px;height:70px;background:#123f45;clip-path:polygon(100% 0,100% 100%,0 100%)}}
 .footLeft,.footCenter,.footRight{{position:relative;z-index:2}}
+.footRight{{min-width:42mm;text-align:right;color:#ffffff;font-size:10px;font-weight:700;align-self:flex-end;padding-bottom:1mm}}
 .footCenter{{text-align:center;flex:1}}
 .tempoLegal{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:10px;line-height:1.3;color:#6b7280;font-weight:600}}
 .footImg{{display:block;max-height:32px;width:auto}}
 .footMark{{max-height:48px}}
 .footRythme{{max-height:28px;margin:6px auto 0 auto}}
 .footTempo{{max-height:28px;margin-left:auto}}
-@media print{{body{{padding:0}} .actions,.rangePanel{{display:none!important}} .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;break-after:page;page-break-after:always;}} .page:last-child{{break-after:auto;page-break-after:auto;}}}}
+@media print{{
+  body{{padding:0}}
+  .actions,.rangePanel{{display:none!important}}
+  body.printCssMode .reportPages{{display:block}}
+  body.printCssMode .page--report{{height:297mm!important;min-height:297mm!important;overflow:hidden!important;break-after:page!important;page-break-after:always!important;}}
+  body.printCssMode .page--report:last-child{{break-after:auto!important;page-break-after:auto!important;}}
+  body.printCssMode .page--report .pageContent{{padding:10mm 8mm 24mm 8mm!important;}}
+  body.printCssMode .page--report .docFooter{{position:absolute;left:0;right:0;bottom:0;}}
+  .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;overflow:hidden;break-after:page;page-break-after:always;}}
+  .page:last-child{{break-after:auto;page-break-after:auto;}}
+}}
 
 {EDITOR_MEMO_MODAL_CSS}
 {QUALITY_MODAL_CSS}
@@ -2375,7 +2636,6 @@ body{{padding:14px 14px 14px 280px;}}
     tempo_logo = _logo_data_url(LOGO_TEMPO_PATH)
     logo_rythme = _logo_data_url(LOGO_RYTHME_PATH)
     logo_tmark = _logo_data_url(LOGO_T_MARK_PATH)
-    qr_logo = _logo_data_url(LOGO_QR_PATH)
     cover_html = ""
 
     next_meeting_date = (meet_date or ref_date) + timedelta(days=7)
@@ -2397,13 +2657,13 @@ body{{padding:14px 14px 14px 280px;}}
         <div class='coverProjectTitle' contenteditable='true'>{_escape(project)}</div>
         <div class='coverCrTitle' contenteditable='true'>CR REUNION DE SYNTHESE TECHNIQUE</div>
         <div class='coverCrMeta'>
-          N°<span contenteditable='true' class='editInline'>06</span>
+          N°<span contenteditable='true' class='editInline' data-sync='cr-number'>{_escape(cr_number_default)}</span>
           du <strong>{_escape(cr_date_txt)}</strong>
         </div>
         <div class='nextMeetingBox'>
           <div class='nextMeetingLine1'>La prochaine réunion de synthèse est fixée au</div>
           <div class='nextMeetingLine2'>
-            <strong>{_escape(next_meeting_date_txt)}</strong>
+            <span contenteditable='true' class='editInline'>{_escape(next_meeting_date_txt)}</span>
             à
             <span contenteditable='true' class='editInline'>14h00</span>
           </div>
@@ -2412,15 +2672,15 @@ body{{padding:14px 14px 14px 280px;}}
         <div class='coverAppNote'>
           Téléchargez gratuitement l’application de gestion de projet METRONOME. L’application développée par TEMPO
           dédiée à la gestion de projet. Celle-ci vous permettra de retrouver l’intégralité des réunions de synthèse, comptes rendu,
-          planning et suivi des tâches dans votre smartphone.
+          planning et suivi des tâches depuis votre smartphone ou votre ordinateur.
         </div>
-        {("<img class='coverQr' src='" + qr_logo + "' alt='QR code METRONOME' />") if qr_logo else ""}
+        <a class='coverUrl' href='https://app.atelier-tempo.fr' target='_blank' rel='noopener'>app.atelier-tempo.fr</a>
       </div>
     """
 
     report_header_html = f"""
       <div class='reportHeader printHeaderFixed'>
-        {_escape(project)} <span class='accent'>— Compte Rendu</span> n°<span contenteditable='true' class='editInline'>06</span> — Réunion de Synthèse du {_escape(cr_date_txt)}
+        {_escape(project)} <span class='accent'>— Compte Rendu</span> n°<span contenteditable='true' class='editInline' data-sync='cr-number'>{_escape(cr_number_default)}</span> — Réunion de Synthèse du {_escape(cr_date_txt)}
       </div>
     """
 
@@ -2552,10 +2812,12 @@ body{{padding:14px 14px 14px 280px;}}
 <script>{EDITOR_MEMO_MODAL_JS}</script>
 <script>{QUALITY_MODAL_JS}</script>
 <script>{ANALYSIS_MODAL_JS}</script>
+<script>{SYNC_EDITABLE_JS}</script>
 <script>{RANGE_PICKER_JS}</script>
 <script>{LAYOUT_CONTROLS_JS}</script>
 <script>{PAGINATION_JS}</script>
 <script>{ROW_CONTROL_JS}</script>
+<script>{ROW_IMAGE_JS}</script>
 <script>{RESIZE_COLUMNS_JS}</script>
 <script>{RESIZE_TOP_JS}</script>
 </body>
