@@ -1550,6 +1550,68 @@ ROW_CONTROL_JS = r"""
 })();
 """
 
+ROW_IMAGE_JS = r"""
+(function(){
+  function repaginate(){
+    if(window.repaginateReport){ window.repaginateReport(); }
+  }
+
+  function bindImageResize(img){
+    if(!img) return;
+    img.addEventListener('load', repaginate, {once:true});
+    img.addEventListener('mouseup', repaginate);
+    img.addEventListener('touchend', repaginate);
+  }
+
+  function setImage(rowId, src){
+    const box = document.querySelector(`[data-row-image-box="${rowId}"]`);
+    if(!box) return;
+    box.innerHTML = `<div class="rowCustomImageFrame"><img class="rowCustomImageEl" src="${src}" alt="Image ajoutée" /></div>`;
+    const img = box.querySelector('img');
+    const frame = box.querySelector('.rowCustomImageFrame');
+    bindImageResize(img);
+    if(frame){
+      frame.addEventListener('mouseup', repaginate);
+      frame.addEventListener('touchend', repaginate);
+    }
+    repaginate();
+  }
+
+  function clearImage(rowId){
+    const box = document.querySelector(`[data-row-image-box="${rowId}"]`);
+    if(!box) return;
+    box.innerHTML = '';
+    repaginate();
+  }
+
+  document.addEventListener('click', (e) => {
+    const addBtn = e.target.closest('[data-row-image-add]');
+    if(addBtn){
+      const rowId = addBtn.getAttribute('data-row-image-add') || '';
+      const input = document.querySelector(`[data-row-image-input="${rowId}"]`);
+      if(input){ input.click(); }
+      return;
+    }
+    const removeBtn = e.target.closest('[data-row-image-remove]');
+    if(removeBtn){
+      const rowId = removeBtn.getAttribute('data-row-image-remove') || '';
+      clearImage(rowId);
+    }
+  });
+
+  document.addEventListener('change', (e) => {
+    const input = e.target.closest('[data-row-image-input]');
+    if(!input || !input.files || !input.files[0]) return;
+    const rowId = input.getAttribute('data-row-image-input') || '';
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = () => setImage(rowId, String(reader.result || ''));
+    reader.readAsDataURL(file);
+    input.value = '';
+  });
+})();
+"""
+
 
 
 # -------------------------
@@ -2004,12 +2066,21 @@ def render_cr(
 
         safe_row_id = _escape(row_id) or _escape(str(r.get(E_COL_ID, "")))
         toggle_html = f"<input type='checkbox' class='rowToggle noPrint' data-target='{safe_row_id}' checked />"
+        image_controls = f"""
+          <div class='rowImageTools noPrint'>
+            <button class='rowImageBtn' type='button' data-row-image-add='{safe_row_id}'>+ Image</button>
+            <button class='rowImageBtn rowImageBtnDanger' type='button' data-row-image-remove='{safe_row_id}'>Supprimer</button>
+            <input class='rowImageInput' type='file' accept='image/*' data-row-image-input='{safe_row_id}' />
+          </div>
+          <div class='rowCustomImage' data-row-image-box='{safe_row_id}'></div>
+        """
         return f"""
           <tr class="{row_cls}" data-row-id="{safe_row_id}">
             <td class="colType">{toggle_html}<div>{tag_html or "—"}</div></td>
             <td class="colComment">
               <div class="commentText">{title}</div>
               {thumbs}
+              {image_controls}
               {render_entry_comment(r)}
             </td>
             <td class="colDate">{created or "—"}</td>
@@ -2390,13 +2461,20 @@ body{{padding:14px 14px 14px 280px;}}
 .colGrip{{position:absolute;top:0;right:-6px;width:12px;height:100%;cursor:col-resize}}
 .colGrip::after{{content:"";position:absolute;top:3px;bottom:3px;left:5px;width:2px;background:#cbd5f5;border-radius:2px;opacity:.7}}
 
-@media print{{ .rowToggle{{display:none}} .noPrintRow{{display:none}} .editableCell{{background:transparent}} }}
+@media print{{ .rowToggle{{display:none}} .noPrintRow{{display:none}} .editableCell{{background:transparent}} .rowImageTools{{display:none!important}} }}
 
 .crTable tr.rowMeeting td{{background:#eef8ff;}}
 .crTable tr.rowMeeting td.colType{{box-shadow:inset 4px 0 0 #2563eb;}}
 
 .thumbs{{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}}
 .thumb{{height:90px;width:auto;border:1px solid var(--border);border-radius:8px;display:block}}
+.rowImageTools{{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}}
+.rowImageBtn{{padding:3px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer}}
+.rowImageBtnDanger{{color:#b91c1c;border-color:#fecaca}}
+.rowImageInput{{display:none}}
+.rowCustomImage{{margin-top:8px}}
+.rowCustomImageFrame{{display:inline-block;resize:both;overflow:auto;min-width:120px;min-height:80px;max-width:100%;border:1px dashed #94a3b8;border-radius:8px;background:#fff;padding:4px}}
+.rowCustomImageEl{{display:block;width:100%;height:100%;min-width:110px;min-height:70px;object-fit:contain;border-radius:6px}}
 .entryComment{{margin-top:8px;padding-left:12px;border-left:3px solid #e2e8f0}}
 .tagReminderGreen{{color:#16a34a;font-weight:900}}
 .thumbA{{display:inline-flex}}
@@ -2632,6 +2710,7 @@ body{{padding:14px 14px 14px 280px;}}
 <script>{LAYOUT_CONTROLS_JS}</script>
 <script>{PAGINATION_JS}</script>
 <script>{ROW_CONTROL_JS}</script>
+<script>{ROW_IMAGE_JS}</script>
 <script>{RESIZE_COLUMNS_JS}</script>
 <script>{RESIZE_TOP_JS}</script>
 </body>
