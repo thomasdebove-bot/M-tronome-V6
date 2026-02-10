@@ -2028,9 +2028,10 @@ def render_cr(
       </div>
     """
 
+    pdf_export_url = f"/export/pdf?meeting_id={urllib.parse.quote(str(meeting_id))}&project={urllib.parse.quote(str(project))}"
     actions_html = f"""
       <div class="actions noPrint">
-        <button class="btn" type="button" onclick="window.print()">Imprimer / PDF</button>
+        <button class="btn" type="button" onclick="window.location.href='{pdf_export_url}'">Imprimer / PDF</button>
         <button class="btn secondary editCompact" type="button" onclick="window.refreshPagination && window.refreshPagination()">Recalculer la mise en page</button>
         <button class="btn secondary editCompact" id="btnQualityCheck" type="button">Qualité du texte</button>
         <button class="btn secondary editCompact" id="btnAnalysis" type="button">Analyse</button>
