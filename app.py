@@ -1368,7 +1368,14 @@ PAGINATION_JS = r"""
     const title = zone.querySelector('.zoneTitle');
     const table = zone.querySelector('table.crTable');
     const tbody = table?.querySelector('tbody');
-    const rows = tbody ? Array.from(tbody.children) : [];
+    const rows = tbody
+      ? Array.from(tbody.children).filter(row => {
+          if(!(row instanceof HTMLElement)) return false;
+          if(row.classList.contains('rowHidden') || row.classList.contains('noPrintRow')) return false;
+          const style = window.getComputedStyle(row);
+          return style.display !== 'none' && style.visibility !== 'hidden';
+        })
+      : [];
     const rowHeights = rows.map(row => row.getBoundingClientRect().height || row.offsetHeight || 0);
     const tableRect = table?.getBoundingClientRect().height || table?.offsetHeight || 0;
     const rowsSum = rowHeights.reduce((sum, h) => sum + h, 0);
@@ -1459,6 +1466,24 @@ PAGINATION_JS = r"""
     }
   }
 
+  function removeEmptyReportPages(container){
+    const pages = Array.from(container.querySelectorAll('.page--report'));
+    pages.forEach((page, index) => {
+      const wrap = page.querySelector('.reportBlocks');
+      if(!wrap) return;
+      const hasVisibleBlock = Array.from(wrap.children).some((child) => {
+        if(!(child instanceof HTMLElement)) return false;
+        if(child.classList.contains('rowHidden') || child.classList.contains('noPrint') || child.classList.contains('noPrintRow')) return false;
+        const style = window.getComputedStyle(child);
+        if(style.display === 'none' || style.visibility === 'hidden') return false;
+        return true;
+      });
+      if(!hasVisibleBlock && index > 0){
+        page.remove();
+      }
+    });
+  }
+
   function paginate(force){
     const forced = !!force;
     if(!forced && isPrintMode()) return;
@@ -1468,11 +1493,18 @@ PAGINATION_JS = r"""
     const blocksContainer = firstPage.querySelector('.reportBlocks');
     if(!blocksContainer) return;
     mergeZoneBlocks(container);
-    const blocks = Array.from(container.querySelectorAll('.reportBlock')).map(block => ({
-      node: block,
-      height: block.getBoundingClientRect().height || block.offsetHeight || 0,
-      splitData: block.classList.contains('zoneBlock') ? getZoneSplitData(block) : null,
-    }));
+    const blocks = Array.from(container.querySelectorAll('.reportBlock'))
+      .filter((block) => {
+        if(!(block instanceof HTMLElement)) return false;
+        if(block.classList.contains('rowHidden') || block.classList.contains('noPrint')) return false;
+        const style = window.getComputedStyle(block);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+      })
+      .map(block => ({
+        node: block,
+        height: block.getBoundingClientRect().height || block.offsetHeight || 0,
+        splitData: block.classList.contains('zoneBlock') ? getZoneSplitData(block) : null,
+      }));
 
     blocks.forEach(({node}) => node.remove());
     clearExtraPages(container);
@@ -1513,6 +1545,9 @@ PAGINATION_JS = r"""
         }
         return;
       }
+      if(splitData && !splitData.rows.length){
+        return;
+      }
       if(used > 0 && used + height > available && template){
         const clone = template.content.firstElementChild.cloneNode(true);
         container.appendChild(clone);
@@ -1527,6 +1562,7 @@ PAGINATION_JS = r"""
     });
 
     compactPages(container);
+    removeEmptyReportPages(container);
     updatePageNumbers();
   }
 
