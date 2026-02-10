@@ -1382,6 +1382,57 @@ PAGINATION_JS = r"""
     return {chunk, nextIndex: endIndex, height};
   }
 
+  function pageBlocks(page){
+    const wrap = page?.querySelector('.reportBlocks');
+    if(!wrap) return [];
+    return Array.from(wrap.children);
+  }
+
+  function pageUsedHeight(page){
+    return pageBlocks(page).reduce((sum, block) => {
+      const h = block.getBoundingClientRect().height || block.offsetHeight || 0;
+      return sum + h;
+    }, 0);
+  }
+
+  function compactPages(container){
+    let pages = Array.from(container.querySelectorAll('.page--report'));
+    let i = 0;
+    while(i < pages.length - 1){
+      const current = pages[i];
+      const next = pages[i + 1];
+      const currentBlocksWrap = current.querySelector('.reportBlocks');
+      const nextBlocksWrap = next.querySelector('.reportBlocks');
+      if(!currentBlocksWrap || !nextBlocksWrap){ i += 1; continue; }
+
+      let moved = false;
+      let safety = 0;
+      while(nextBlocksWrap.firstElementChild && safety < 200){
+        safety += 1;
+        const candidate = nextBlocksWrap.firstElementChild;
+        const candidateHeight = candidate.getBoundingClientRect().height || candidate.offsetHeight || 0;
+        const available = calcAvailable(current, i === 0);
+        const used = pageUsedHeight(current);
+        if(used + candidateHeight <= available){
+          currentBlocksWrap.appendChild(candidate);
+          moved = true;
+          continue;
+        }
+        break;
+      }
+
+      if(!nextBlocksWrap.firstElementChild){
+        next.remove();
+        pages = Array.from(container.querySelectorAll('.page--report'));
+        continue;
+      }
+      i += 1;
+      if(moved){
+        pages = Array.from(container.querySelectorAll('.page--report'));
+      }
+    }
+  }
+
   function paginate(){
     const container = document.querySelector('.reportPages');
     const firstPage = container?.querySelector('.page--report');
@@ -1446,6 +1497,8 @@ PAGINATION_JS = r"""
       const actualHeight = node.getBoundingClientRect().height || height;
       used += actualHeight;
     });
+
+    compactPages(container);
   }
 
   window.repaginateReport = paginate;
