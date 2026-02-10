@@ -2850,127 +2850,45 @@ def _extract_print_content_from_cr_html(full_html: str) -> str:
     return content.strip()
 
 
+def _extract_styles_from_cr_html(full_html: str) -> str:
+    styles = re.findall(r"<style[^>]*>(.*?)</style>", full_html, flags=re.IGNORECASE | re.DOTALL)
+    return "\n\n".join(styles).strip()
+
+
 def render_print_html(
     content_html: str,
     *,
     project: str = "",
     meeting_date: str = "",
     report_number: str = "",
+    source_css: str = "",
 ) -> str:
-    tempo_logo = _logo_data_url(LOGO_TEMPO_PATH)
-    logo_html = (
-        f"<img class='printLogo' src='{tempo_logo}' alt='TEMPO' />" if tempo_logo else "<div class='printLogoFallback'>TEMPO</div>"
-    )
     project_txt = _escape(project or "Projet")
     date_txt = _escape(meeting_date or date.today().strftime("%d/%m/%Y"))
     report_txt = _escape(report_number or "-")
+    base_css = source_css or ""
+    paged_css = """
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+    html, body { margin: 0; padding: 0; background: #fff; }
+    .actions, .rangePanel, .noPrint { display: none !important; }
+    .page { break-after: page; page-break-after: always; }
+    .page:last-child { break-after: auto; page-break-after: auto; }
+    """
     return f"""
 <!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
   <title>{project_txt} - Export PDF</title>
-  <style>
-    @page {{
-      size: A4 portrait;
-      margin: 24mm 12mm 22mm 12mm;
-      @top-center {{ content: element(page-header); }}
-      @bottom-center {{ content: element(page-footer); }}
-      @bottom-right {{
-        content: "Page " counter(page) " / " counter(pages);
-        color: #0f3a40;
-        font-size: 10pt;
-        font-weight: 700;
-      }}
-    }}
+  <style>{base_css}
 
-    html, body {{ margin: 0; padding: 0; }}
-    body {{
-      font-family: Arial, "Segoe UI", sans-serif;
-      font-size: 10.5pt;
-      line-height: 1.35;
-      color: #0f172a;
-    }}
-
-    header.printHeader {{
-      position: running(page-header);
-      border-bottom: 1px solid #d1d5db;
-      padding: 4mm 0 3mm 0;
-      display: table;
-      width: 100%;
-      table-layout: fixed;
-    }}
-    .printHeaderLeft, .printHeaderCenter, .printHeaderRight {{ display: table-cell; vertical-align: middle; }}
-    .printHeaderLeft {{ width: 24%; }}
-    .printHeaderCenter {{ width: 52%; text-align: center; font-size: 11pt; }}
-    .printHeaderCenter .accent {{ color: #f59e0b; font-weight: 700; }}
-    .printHeaderRight {{ width: 24%; text-align: right; color: #475569; font-size: 9.5pt; }}
-    .printLogo {{ max-height: 22mm; width: auto; display: block; }}
-    .printLogoFallback {{ font-weight: 800; font-size: 12pt; color: #0f3a40; }}
-
-    footer.printFooter {{
-      position: running(page-footer);
-      border-top: 1px solid #d1d5db;
-      padding-top: 2.5mm;
-      font-size: 8.5pt;
-      color: #475569;
-      text-align: center;
-    }}
-
-    main.printMain {{ margin: 0; padding: 0; }}
-
-    .wrap, .page, .pageContent, .reportPages, .reportTables {{
-      width: auto !important;
-      height: auto !important;
-      min-height: 0 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      box-shadow: none !important;
-      overflow: visible !important;
-      break-after: auto !important;
-      page-break-after: auto !important;
-    }}
-
-    .page--cover, .actions, .rangePanel, .noPrint, .docFooter, .printHeaderFixed {{ display: none !important; }}
-    .page--report {{ display: block !important; }}
-
-    .reportBlocks {{ display: block !important; }}
-    .zoneBlock {{ margin: 0 0 3mm 0 !important; }}
-    .zoneTitle {{
-      margin: 0;
-      padding: 1.8mm 2.2mm;
-      background: #f59e0b;
-      color: #fff;
-      font-size: 10pt;
-      font-weight: 800;
-    }}
-
-    table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
-    thead {{ display: table-header-group; }}
-    tfoot {{ display: table-footer-group; }}
-    tr, td, th {{ page-break-inside: avoid; }}
-    th, td {{ border: 1px solid #cbd5e1; padding: 2mm 1.8mm; vertical-align: top; font-size: 9.5pt; }}
-    th {{ background: #1f4e4f; color: #fff; text-align: center; font-weight: 800; }}
-
-    .sessionSubRow td.colComment {{ font-weight: 800; color: #0f172a; text-decoration: none; }}
-    .colType {{ font-weight: 800; }}
-    .colDate, .colLot, .colWho {{ text-align: center; white-space: nowrap; }}
-
-    .reportNote {{ margin-top: 5mm; font-size: 9.5pt; }}
-  </style>
+{paged_css}</style>
 </head>
-<body>
-  <header class="printHeader">
-    <div class="printHeaderLeft">{logo_html}</div>
-    <div class="printHeaderCenter">{project_txt} <span class="accent">— Compte Rendu n° {report_txt}</span></div>
-    <div class="printHeaderRight">Réunion du {date_txt}</div>
-  </header>
-
-  <footer class="printFooter">
-    TEMPO — 35, rue Beaubourg, 75003 Paris — SAS au capital de 1 000 Euros - RCS Créteil N° 892 046 301 - APE 7112 B
-  </footer>
-
-  <main class="printMain">{content_html}</main>
+<body data-export="weasyprint" data-project="{project_txt}" data-meeting-date="{date_txt}" data-report-number="{report_txt}">
+  {content_html}
 </body>
 </html>
 """
@@ -3033,6 +2951,7 @@ def export_pdf(
     project: str = Query(default=""),
 ):
     try:
+        source_css = ""
         if payload and payload.content_html.strip():
             project_name = (payload.project or project or "").strip()
             meeting_date_txt = (payload.meeting_date or "").strip()
@@ -3047,6 +2966,7 @@ def export_pdf(
             report_index, report_total = _meeting_sequence_for_project(meetings_df, meeting_id)
             report_number = f"{report_index}/{report_total}"
             source_html = render_cr(meeting_id=meeting_id, project=project_name, print_mode=True)
+            source_css = _extract_styles_from_cr_html(source_html)
             clean_content = _extract_print_content_from_cr_html(source_html)
             safe_project = re.sub(r"[^A-Za-z0-9_-]+", "_", project_name).strip("_") or "projet"
             filename = f"CR_{safe_project}_{meeting_id}.pdf"
@@ -3061,6 +2981,7 @@ def export_pdf(
             project=project_name,
             meeting_date=meeting_date_txt,
             report_number=report_number,
+            source_css=source_css,
         )
         WeasyHTML = _weasy_html_or_raise()
         try:
