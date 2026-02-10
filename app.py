@@ -2625,7 +2625,7 @@ body.printCssMode .noPrint{{display:none!important}}
 @media print{{
   .printHeaderFixed{{position:static!important;top:auto;left:auto;right:auto;padding:0;z-index:auto;}}
   .page--cover .printHeaderFixed{{display:none!important;}}
-  body.printCssMode .page--report .printHeaderFixed{{position:sticky!important;top:0;background:#fff;padding:1mm 0;z-index:20;display:block!important;}}
+  body.printCssMode .page--report .printHeaderFixed{{position:static!important;top:auto;background:transparent;padding:0;z-index:auto;display:block!important;}}
 }}
 .reportHeader .accent{{color:#f59e0b;font-weight:900}}
 .presenceTable .presenceList{{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}}
@@ -2647,10 +2647,8 @@ body.printCssMode .noPrint{{display:none!important}}
   body{{padding:0}}
   .actions,.rangePanel{{display:none!important}}
   body.printCssMode .reportPages{{display:block}}
-  body.printCssMode .page--report{{height:297mm!important;min-height:297mm!important;overflow:hidden!important;break-after:page!important;page-break-after:always!important;}}
+  body.printCssMode .page--report{{break-after:page!important;page-break-after:always!important;}}
   body.printCssMode .page--report:last-child{{break-after:auto!important;page-break-after:auto!important;}}
-  body.printCssMode .page--report .pageContent{{padding:10mm 8mm 24mm 8mm!important;}}
-  body.printCssMode .page--report .docFooter{{position:absolute;left:0;right:0;bottom:0;}}
   .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;overflow:hidden;break-after:page;page-break-after:always;}}
   .page:last-child{{break-after:auto;page-break-after:auto;}}
 }}
