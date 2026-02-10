@@ -1284,17 +1284,6 @@ LAYOUT_CONTROLS_JS = r"""
 
 PAGINATION_JS = r"""
 (function(){
-  function normalizeReportForPrint(){
-    const container = document.querySelector('.reportPages');
-    const firstPage = container?.querySelector('.page--report');
-    const firstBlocks = firstPage?.querySelector('.reportBlocks');
-    if(!container || !firstPage || !firstBlocks) return;
-    const blocks = Array.from(container.querySelectorAll('.reportBlock'));
-    firstBlocks.innerHTML = '';
-    blocks.forEach(block => firstBlocks.appendChild(block));
-    const pages = Array.from(container.querySelectorAll('.page--report'));
-    pages.slice(1).forEach(p => p.remove());
-  }
 
   function px(value){
     const n = parseFloat(value || "0");
@@ -1444,7 +1433,6 @@ PAGINATION_JS = r"""
   }
 
   function paginate(){
-    if(document.body.classList.contains('printNativeMode')) return;
     const container = document.querySelector('.reportPages');
     const firstPage = container?.querySelector('.page--report');
     if(!container || !firstPage) return;
@@ -1516,11 +1504,8 @@ PAGINATION_JS = r"""
   window.refreshPagination = function(options){
     if(!window.repaginateReport){ return; }
     const forPrint = !!(options && options.forPrint);
-    if(forPrint){
-      document.body.classList.add('printNativeMode');
-      normalizeReportForPrint();
-      return;
-    }
+    const body = document.body;
+    if(forPrint && body){ body.classList.add('printModeSim'); }
     let runs = 0;
     const run = () => {
       window.repaginateReport();
@@ -1543,7 +1528,7 @@ PAGINATION_JS = r"""
     window.refreshPagination && window.refreshPagination({forPrint:true});
   });
   window.addEventListener('afterprint', () => {
-    document.body.classList.remove('printNativeMode');
+    document.body.classList.remove('printModeSim');
     window.repaginateReport && window.repaginateReport();
   });
 })();
@@ -2585,7 +2570,8 @@ body{{padding:14px 14px 14px 280px;}}
 .coverNoteTitle{{font-weight:1000;margin-bottom:6px}}
 .reportHeader{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:11px;font-weight:400;color:#0b1220;text-align:center;margin:0 0 10px 0;}}
 @media print{{
-  body.printNativeMode .printHeaderFixed{{position:fixed;top:10mm;left:8mm;right:8mm;background:#fff;padding:1mm 0;z-index:30;}}
+  .printHeaderFixed{{position:static!important;top:auto;left:auto;right:auto;padding:0;z-index:auto;}}
+  .page--cover .printHeaderFixed{{display:none!important;}}
 }}
 .reportHeader .accent{{color:#f59e0b;font-weight:900}}
 .presenceTable .presenceList{{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}}
@@ -2603,11 +2589,6 @@ body{{padding:14px 14px 14px 280px;}}
 @media print{{
   body{{padding:0}}
   .actions,.rangePanel{{display:none!important}}
-  body.printNativeMode .reportPages{{display:block}}
-  body.printNativeMode .reportPages .page--report{{width:auto;height:auto;min-height:0;margin:0;box-shadow:none;overflow:visible;break-after:auto;page-break-after:auto;}}
-  body.printNativeMode .reportPages .page--report + .page--report{{display:none!important}}
-  body.printNativeMode .reportPages .page--report .pageContent{{padding-top:18mm;padding-bottom:30mm;}}
-  body.printNativeMode .reportPages .page--report .docFooter{{position:fixed;left:8mm;right:8mm;bottom:10mm;}}
   .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;overflow:hidden;break-after:page;page-break-after:always;}}
   .page:last-child{{break-after:auto;page-break-after:auto;}}
 }}
