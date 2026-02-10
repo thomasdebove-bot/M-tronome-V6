@@ -2398,26 +2398,26 @@ body.printCssMode .noPrint{{display:none!important}}
 .topPage{{transform:scale(var(--top-scale));transform-origin:top left}}
 @media print{{.topPage{{margin:0;}}}}
 .reportTables{{margin-top:0}}
-.coverHero{{position:relative;overflow:hidden;background:#fff;min-height:420px}}
-.coverHeroImg{{position:relative;min-height:430px;background-size:cover;background-position:center}}
-.coverHeroFade{{position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,0));}}
-.coverHeroCurve{{position:absolute;left:50%;bottom:-95px;width:135%;height:190px;transform:translateX(-50%);background:#fff;border-radius:50% 50% 0 0 / 100% 100% 0 0;z-index:2}}
-.coverHeroLogoWrap{{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:4;background:#fff;padding:10px 18px;border-radius:8px;box-shadow:0 6px 18px rgba(2,6,23,.12)}}
-.coverHeroLogo{{height:110px;width:auto;display:block}}
-.coverNoteCenter{{text-align:center;padding:10px 16px 12px 16px;font-weight:900;display:flex;flex-direction:column;align-items:center;gap:10px}}
-.coverAppNote{{margin-top:22px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:14px;line-height:1.45;color:#f97316;font-style:italic;font-weight:600;max-width:640px}}
-.coverUrl{{margin-top:12px;font-weight:900;color:#f97316;text-decoration:underline;text-underline-offset:3px}}
-.coverUrl::after{{content:" ↗";font-weight:900}}
-.coverProjectTitle{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#f59e0b;font-weight:700;letter-spacing:.5px;text-transform:uppercase}}
-.coverCrTitle{{margin-top:10px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#0f3a40;font-weight:700}}
-.coverCrMeta{{margin-top:8px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#0f3a40;font-weight:700}}
+.coverHero{{position:relative;overflow:hidden;background:#fff;min-height:430px}}
+.coverHeroImg{{position:relative;height:430px;background-size:cover;background-position:center}}
+.coverHeroFade{{position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0));}}
+.coverHeroCurve{{position:absolute;left:50%;bottom:-94px;width:138%;height:188px;transform:translateX(-50%);background:#fff;border-radius:50% 50% 0 0 / 100% 100% 0 0;z-index:2}}
+.coverHeroLogoWrap{{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:4;background:#fff;padding:12px 20px;border-radius:12px;box-shadow:0 8px 20px rgba(2,6,23,.16)}}
+.coverHeroLogo{{height:104px;width:auto;display:block}}
+.coverNoteCenter{{text-align:center;padding:28px 16px 14px 16px;font-weight:900;display:flex;flex-direction:column;align-items:center;gap:14px}}
+.coverAppNote{{margin-top:18px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:14px;line-height:1.45;color:#f97316;font-style:italic;font-weight:700;max-width:760px}}
+.coverUrl{{margin-top:8px;font-weight:900;color:#f97316;text-decoration:underline;text-underline-offset:3px}}
+.coverUrl::after{{content:" \2197";font-weight:900}}
+.coverProjectTitle{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:60px;line-height:1.1;color:#f59e0b;font-weight:800;letter-spacing:.6px;text-transform:uppercase}}
+.coverCrTitle{{margin-top:4px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:60px;line-height:1.1;color:#0f3a40;font-weight:800;text-transform:uppercase}}
+.coverCrMeta{{margin-top:2px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:64px;line-height:1.1;color:#0f3a40;font-weight:900}}
 .editInline{{display:inline-block;min-width:40px;padding:0 4px;border-bottom:2px dashed #cbd5e1;outline:none}}
 @media print{{.editInline{{border-bottom:none}}}}
-.nextMeetingBox{{margin:18px auto 0 auto;max-width:78%;border:2px solid #111;padding:12px 10px;font-weight:1000}}
-.nextMeetingLine1{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:18px}}
-.nextMeetingLine2{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:18px;color:#ef4444;margin-top:5px}}
-.nextMeetingLine3{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:18px;color:#111;margin-top:4px;outline:none}}
-@media print{{.coverHeroImg{{min-height:390px}} .coverProjectTitle{{font-size:44px}} .coverCrTitle{{font-size:33px}} .coverCrMeta{{font-size:36px}} .nextMeetingLine1{{font-size:18px}} .nextMeetingLine2{{font-size:32px}} .nextMeetingLine3{{font-size:27px}}}}
+.nextMeetingBox{{margin:14px auto 0 auto;max-width:82%;border:2px solid #111;padding:14px 12px 12px 12px;font-weight:1000}}
+.nextMeetingLine1{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:56px;line-height:1.1;color:#111}}
+.nextMeetingLine2{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:74px;color:#ef4444;margin-top:4px;line-height:1.05;font-weight:900}}
+.nextMeetingLine3{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:66px;color:#111;margin-top:4px;outline:none;line-height:1.05;font-weight:900}}
+@media print{{.coverHeroImg{{height:420px;min-height:420px}} .coverProjectTitle{{font-size:60px}} .coverCrTitle{{font-size:60px}} .coverCrMeta{{font-size:64px}} .nextMeetingLine1{{font-size:56px}} .nextMeetingLine2{{font-size:74px}} .nextMeetingLine3{{font-size:66px}}}}
 
 /* PROJECT BANNER */
 .banner{{
@@ -2663,17 +2663,10 @@ body.printCssMode .noPrint{{display:none!important}}
       <div class='coverNoteCenter'>
         <div class='coverProjectTitle' contenteditable='true'>{_escape(project)}</div>
         <div class='coverCrTitle' contenteditable='true'>CR REUNION DE SYNTHESE TECHNIQUE</div>
-        <div class='coverCrMeta'>
-          N°<span contenteditable='true' class='editInline' data-sync='cr-number'>{_escape(cr_number_default)}</span>
-          du <strong>{_escape(cr_date_txt)}</strong>
-        </div>
+        <div class='coverCrMeta'>N° <span contenteditable='true' class='editInline' data-sync='cr-number'>{_escape(cr_number_default)}</span> du <strong>{_escape(cr_date_txt)}</strong></div>
         <div class='nextMeetingBox'>
           <div class='nextMeetingLine1'>La prochaine réunion de synthèse est fixée au</div>
-          <div class='nextMeetingLine2'>
-            <span contenteditable='true' class='editInline'>{_escape(next_meeting_date_txt)}</span>
-            à
-            <span contenteditable='true' class='editInline'>14h00</span>
-          </div>
+          <div class='nextMeetingLine2'><span contenteditable='true' class='editInline'>{_escape(next_meeting_date_txt)}</span> à <span contenteditable='true' class='editInline'>14h00</span></div>
           <div contenteditable='true' class='nextMeetingLine3'>BASE VIE — adresse à compléter</div>
         </div>
         <div class='coverAppNote'>
@@ -2684,7 +2677,6 @@ body.printCssMode .noPrint{{display:none!important}}
         <a class='coverUrl' href='https://app.atelier-tempo.fr' target='_blank' rel='noopener'>app.atelier-tempo.fr</a>
       </div>
     """
-
     report_header_html = f"""
       <div class='reportHeader printHeaderFixed'>
         {_escape(project)} <span class='accent'>— Compte Rendu</span> n°<span contenteditable='true' class='editInline' data-sync='cr-number'>{_escape(cr_number_default)}</span> — Réunion de Synthèse du {_escape(cr_date_txt)}
