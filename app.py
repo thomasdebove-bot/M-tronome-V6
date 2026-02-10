@@ -1561,6 +1561,37 @@ PAGINATION_JS = r"""
     document.body.classList.remove('printModeSim');
     window.repaginateReport && window.repaginateReport();
   });
+  window.exportCurrentPdf = async function(){
+    try{
+      const finalHtml = document.documentElement.outerHTML || '';
+      const payload = {
+        final_html: finalHtml,
+        project: (document.getElementById('project')?.value || document.body.dataset.project || '').trim(),
+        filename: 'rapport.pdf',
+      };
+      const res = await fetch('/export/pdf', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+      if(!res.ok){
+        const txt = await res.text();
+        alert('Erreur export PDF: ' + txt);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'rapport.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 8000);
+    }catch(err){
+      alert('Erreur export PDF: ' + (err && err.message ? err.message : String(err)));
+    }
+  };
   window.addEventListener('DOMContentLoaded', updatePageNumbers);
 })();
 """
@@ -2033,10 +2064,9 @@ def render_cr(
       </div>
     """
 
-    pdf_export_url = f"/export/pdf?meeting_id={urllib.parse.quote(str(meeting_id))}&project={urllib.parse.quote(str(project))}"
     actions_html = f"""
       <div class="actions noPrint">
-        <button class="btn" type="button" onclick="window.location.href='{pdf_export_url}'">Imprimer / PDF</button>
+        <button class="btn" type="button" onclick="window.exportCurrentPdf && window.exportCurrentPdf()">Imprimer / PDF</button>
         <button class="btn secondary editCompact" type="button" onclick="window.refreshPagination && window.refreshPagination()">Recalculer la mise en page</button>
         <button class="btn secondary editCompact" id="btnQualityCheck" type="button">Qualité du texte</button>
         <button class="btn secondary editCompact" id="btnAnalysis" type="button">Analyse</button>
@@ -2834,6 +2864,7 @@ body.printCssMode .noPrint{{display:none!important}}
 
 class ExportPdfPayload(BaseModel):
     content_html: str = ""
+    final_html: str = ""
     project: str = ""
     meeting_date: str = ""
     report_number: str = ""
@@ -2876,6 +2907,46 @@ def render_print_html(
     .actions, .rangePanel, .noPrint { display: none !important; }
     .page { break-after: page; page-break-after: always; }
     .page:last-child { break-after: auto; page-break-after: auto; }
+
+    /* PDF-only global layout controls */
+    body[data-export="weasyprint"] .page { position: relative; overflow: hidden; }
+    body[data-export="weasyprint"] .page .pageContent {
+      padding-bottom: 28mm !important;
+      box-sizing: border-box;
+    }
+    body[data-export="weasyprint"] .page .docFooter {
+      position: absolute !important;
+      left: 0; right: 0; bottom: 0;
+    }
+    body[data-export="weasyprint"] .page--report .footRight {
+      font-size: 0 !important;
+      color: transparent !important;
+    }
+    body[data-export="weasyprint"] .page--report .footRight::before {
+      content: counter(page) "/" counter(pages);
+      color: #ffffff;
+      font-size: 11pt;
+      font-weight: 800;
+    }
+
+    body[data-export="weasyprint"] .page--report .reportHeader {
+      display: block !important;
+      margin: 0 0 8px 0 !important;
+    }
+
+    body[data-export="weasyprint"] .crTable {
+      table-layout: fixed;
+      width: 100%;
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+    body[data-export="weasyprint"] .crTable thead {
+      display: table-header-group !important;
+    }
+    body[data-export="weasyprint"] .crTable tbody tr {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
 
     /* PDF-only cover harmonization: keep hero + title block on the same cover page */
     body[data-export="weasyprint"] .page--cover {
@@ -2978,7 +3049,15 @@ def export_pdf(
 ):
     try:
         source_css = ""
-        if payload and payload.content_html.strip():
+        if payload and payload.final_html.strip():
+            project_name = (payload.project or project or "").strip()
+            meeting_date_txt = (payload.meeting_date or "").strip()
+            report_number = (payload.report_number or "").strip()
+            source_html = payload.final_html
+            source_css = _extract_styles_from_cr_html(source_html)
+            clean_content = _extract_print_content_from_cr_html(source_html)
+            filename = (payload.filename or "rapport.pdf").strip() or "rapport.pdf"
+        elif payload and payload.content_html.strip():
             project_name = (payload.project or project or "").strip()
             meeting_date_txt = (payload.meeting_date or "").strip()
             report_number = (payload.report_number or "").strip()
