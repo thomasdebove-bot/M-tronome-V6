@@ -3058,7 +3058,17 @@ def export_pdf(
             report_number=report_number,
         )
         WeasyHTML = _weasy_html_or_raise()
-        pdf_bytes = WeasyHTML(string=html, base_url=os.getcwd()).write_pdf()
+        try:
+            pdf_bytes = WeasyHTML(string=html, base_url=os.getcwd()).write_pdf()
+        except Exception as exc:
+            return JSONResponse(
+                {
+                    "error": "Echec generation PDF WeasyPrint",
+                    "detail": str(exc),
+                    "hint": "Verifiez les dependances systeme WeasyPrint (GTK/Pango/Cairo) et les chemins de ressources.",
+                },
+                status_code=503,
+            )
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -3069,6 +3079,8 @@ def export_pdf(
             {"error": str(err), "label": err.label, "path": err.path, "env_var": err.env_var},
             status_code=503,
         )
+    except Exception as exc:
+        return JSONResponse({"error": "Internal error during /export/pdf", "detail": str(exc)}, status_code=500)
 
 
 
