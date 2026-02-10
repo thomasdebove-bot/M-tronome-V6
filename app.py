@@ -1309,7 +1309,7 @@ PAGINATION_JS = r"""
     if(blocksWrap && footer){
       const blocksTop = blocksWrap.getBoundingClientRect().top;
       const footerTop = footer.getBoundingClientRect().top;
-      return Math.max(0, footerTop - blocksTop - 2);
+      return Math.max(0, footerTop - blocksTop);
     }
     const pageContent = page.querySelector('.pageContent');
     const header = page.querySelector('.reportHeader');
@@ -1498,7 +1498,7 @@ PAGINATION_JS = r"""
         let rowIndex = 0;
         while(rowIndex < splitData.rows.length){
           const remaining = available - used;
-          if(remaining <= splitData.titleHeight + splitData.tableOverhead && template && used > 0){
+          if(remaining < splitData.titleHeight + splitData.tableOverhead && template && used > 0){
             const clone = template.content.firstElementChild.cloneNode(true);
             container.appendChild(clone);
             currentPage = clone;
@@ -2557,17 +2557,17 @@ body.printCssMode .noPrint{{display:none!important}}
 .zoneBlock{{margin:0}}
 .zoneBlock + .zoneBlock{{margin-top:0}}
 .reportBlocks{{display:flex;flex-direction:column;gap:0}}
-.reportBlock{{break-inside:avoid;page-break-inside:avoid}}
+.reportBlock{{break-inside:auto;page-break-inside:auto}}
 .reportNote{{margin-top:12px}}
 .crTable{{width:100%;border-collapse:collapse;table-layout:fixed;border:1px solid var(--border);margin-top:-1px;}}
 .crTable thead{{display:table-header-group}}
 .crTable tfoot{{display:table-footer-group}}
 .crTable th, .crTable td{{border:1px solid var(--border);padding:7px 8px;vertical-align:top;page-break-inside:avoid;break-inside:avoid;}}
-.crTable tr{{page-break-inside:avoid;break-inside:avoid;}}
-.annexTable tr{{page-break-inside:avoid;break-inside:avoid;}}
-.zoneBlock{{break-inside:avoid-page;page-break-inside:avoid;}}
-.zoneTitle{{break-after:avoid-page;page-break-after:avoid;}}
-.sessionSubRow{{break-after:avoid-page;page-break-after:avoid;}}
+.crTable tr{{page-break-inside:auto;break-inside:auto;}}
+.annexTable tr{{page-break-inside:auto;break-inside:auto;}}
+.zoneBlock{{break-inside:auto;page-break-inside:auto;}}
+.zoneTitle{{break-after:auto;page-break-after:auto;}}
+.sessionSubRow{{break-after:auto;page-break-after:auto;}}
 .crTable th{{background:#1f4e4f;color:#fff;text-align:center;font-weight:900;font-size:11px;line-height:1.2;white-space:nowrap}}
 .crTable td{{font-size:11px;line-height:1.3;word-break:normal;overflow-wrap:break-word;hyphens:none}}
 .crTable td.colDate, .crTable th.colDate{{padding:6px 4px}}
