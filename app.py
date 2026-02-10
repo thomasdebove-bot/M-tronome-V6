@@ -1288,19 +1288,6 @@ PAGINATION_JS = r"""
     return document.body.classList.contains('printCssMode') || window.matchMedia('print').matches;
   }
 
-  function flattenForPrint(){
-    const container = document.querySelector('.reportPages');
-    const firstPage = container?.querySelector('.page--report');
-    const firstBlocks = firstPage?.querySelector('.reportBlocks');
-    if(!container || !firstPage || !firstBlocks) return;
-    mergeZoneBlocks(container);
-    const blocks = Array.from(container.querySelectorAll('.reportBlock'));
-    firstBlocks.innerHTML = '';
-    blocks.forEach(block => firstBlocks.appendChild(block));
-    const pages = Array.from(container.querySelectorAll('.page--report'));
-    pages.slice(1).forEach(p => p.remove());
-  }
-
   function px(value){
     const n = parseFloat(value || "0");
     return Number.isNaN(n) ? 0 : n;
@@ -1543,7 +1530,6 @@ PAGINATION_JS = r"""
   });
   window.addEventListener('beforeprint', () => {
     document.body.classList.add('printCssMode');
-    flattenForPrint();
   });
   window.addEventListener('afterprint', () => {
     document.body.classList.remove('printCssMode');
@@ -2592,7 +2578,7 @@ body.printCssMode .noPrint{{display:none!important}}
 @media print{{
   .printHeaderFixed{{position:static!important;top:auto;left:auto;right:auto;padding:0;z-index:auto;}}
   .page--cover .printHeaderFixed{{display:none!important;}}
-  body.printCssMode .printHeaderFixed{{position:static!important;}}
+  body.printCssMode .page--report .printHeaderFixed{{position:sticky!important;top:0;background:#fff;padding:1mm 0;z-index:20;display:block!important;}}
 }}
 .reportHeader .accent{{color:#f59e0b;font-weight:900}}
 .presenceTable .presenceList{{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}}
@@ -2611,10 +2597,10 @@ body.printCssMode .noPrint{{display:none!important}}
   body{{padding:0}}
   .actions,.rangePanel{{display:none!important}}
   body.printCssMode .reportPages{{display:block}}
-  body.printCssMode .page--report{{height:auto!important;min-height:0!important;overflow:visible!important;break-after:auto!important;page-break-after:auto!important;}}
-  body.printCssMode .page--report + .page--report{{display:none!important}}
+  body.printCssMode .page--report{{height:297mm!important;min-height:297mm!important;overflow:hidden!important;break-after:page!important;page-break-after:always!important;}}
+  body.printCssMode .page--report:last-child{{break-after:auto!important;page-break-after:auto!important;}}
   body.printCssMode .page--report .pageContent{{padding:10mm 8mm 34mm 8mm!important;}}
-  body.printCssMode .page--report .docFooter{{position:fixed;left:0;right:0;bottom:0;}}
+  body.printCssMode .page--report .docFooter{{position:absolute;left:0;right:0;bottom:0;}}
   .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;overflow:hidden;break-after:page;page-break-after:always;}}
   .page:last-child{{break-after:auto;page-break-after:auto;}}
 }}
