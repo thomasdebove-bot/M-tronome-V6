@@ -448,6 +448,11 @@ def _meeting_sequence_for_project(
     return index, total
 
 
+def meetings_for_project(project_title: str) -> pd.DataFrame:
+    m = get_meetings().copy()
+    m_project = _series(m, M_COL_PROJECT_TITLE, "").fillna("").astype(str).str.strip()
+    return m.loc[m_project == str(project_title).strip()].copy()
+
 # -------------------------
 # IMAGES (robust)
 # -------------------------
