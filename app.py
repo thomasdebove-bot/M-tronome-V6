@@ -1415,6 +1415,49 @@ PAGINATION_JS = r"""
   }
 
   function compactPages(container){
+    function mergeRowsIntoExistingZone(currentBlocksWrap, candidate, available, used){
+      if(!candidate.classList.contains('zoneBlock')) return false;
+      const zoneId = candidate.getAttribute('data-zone-id') || '';
+      if(!zoneId) return false;
+      const zones = Array.from(currentBlocksWrap.querySelectorAll('.zoneBlock'));
+      let targetZone = null;
+      for(let z=zones.length - 1; z>=0; z--){
+        const zone = zones[z];
+        if((zone.getAttribute('data-zone-id') || '') === zoneId){
+          targetZone = zone;
+          break;
+        }
+      }
+      if(!targetZone) return false;
+      const targetBody = targetZone.querySelector('tbody');
+      const sourceBody = candidate.querySelector('tbody');
+      if(!targetBody || !sourceBody) return false;
+
+      let projectedUsed = used;
+      let movedRows = 0;
+      const rows = Array.from(sourceBody.children);
+      for(let r=0; r<rows.length; r++){
+        const row = rows[r];
+        const rowHeight = row.getBoundingClientRect().height || row.offsetHeight || 0;
+        if(projectedUsed + rowHeight > available){ break; }
+        targetBody.appendChild(row);
+        projectedUsed += rowHeight;
+        movedRows += 1;
+      }
+
+      if(movedRows > 0){
+        const lastMoved = targetBody.lastElementChild;
+        if(lastMoved && lastMoved.classList.contains('sessionSubRow')){
+          sourceBody.insertBefore(lastMoved, sourceBody.firstChild);
+          movedRows -= 1;
+        }
+      }
+
+      if(movedRows <= 0) return false;
+      if(!sourceBody.firstElementChild){ candidate.remove(); }
+      return true;
+    }
+
     let pages = Array.from(container.querySelectorAll('.page--report'));
     let i = 0;
     while(i < pages.length - 1){
@@ -1426,7 +1469,7 @@ PAGINATION_JS = r"""
 
       let moved = false;
       let safety = 0;
-      while(nextBlocksWrap.firstElementChild && safety < 200){
+      while(nextBlocksWrap.firstElementChild && safety < 240){
         safety += 1;
         const candidate = nextBlocksWrap.firstElementChild;
         const candidateHeight = candidate.getBoundingClientRect().height || candidate.offsetHeight || 0;
@@ -1434,6 +1477,12 @@ PAGINATION_JS = r"""
         const used = pageUsedHeight(current);
         const remaining = available - used;
         if(remaining <= 0){ break; }
+
+        if(mergeRowsIntoExistingZone(currentBlocksWrap, candidate, available, used)){
+          moved = true;
+          continue;
+        }
+
         if(used + candidateHeight <= available){
           currentBlocksWrap.appendChild(candidate);
           moved = true;
