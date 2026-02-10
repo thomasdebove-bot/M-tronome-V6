@@ -1308,6 +1308,13 @@ PAGINATION_JS = r"""
   }
 
   function calcAvailable(page, includePresence){
+    const blocksWrap = page.querySelector('.reportBlocks');
+    const footer = page.querySelector('.docFooter');
+    if(blocksWrap && footer){
+      const blocksTop = blocksWrap.getBoundingClientRect().top;
+      const footerTop = footer.getBoundingClientRect().top;
+      return Math.max(0, footerTop - blocksTop - 2);
+    }
     const pageContent = page.querySelector('.pageContent');
     const header = page.querySelector('.reportHeader');
     const presence = page.querySelector('.presenceWrap');
