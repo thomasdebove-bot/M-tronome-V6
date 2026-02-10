@@ -1364,7 +1364,7 @@ PAGINATION_JS = r"""
       endIndex += 1;
       if(endIndex === startIndex + 1 && height > maxHeight){ break; }
     }
-    if(endIndex > startIndex && rows[endIndex - 1]?.classList.contains('sessionSubRow')){
+    while(endIndex > startIndex && rows[endIndex - 1]?.classList.contains('sessionSubRow')){
       endIndex -= 1;
     }
     if(endIndex === startIndex && rows[startIndex]?.classList.contains('sessionSubRow') && startIndex + 1 < total){
@@ -1451,7 +1451,15 @@ PAGINATION_JS = r"""
   window.repaginateReport = paginate;
   window.refreshPagination = function(){
     if(!window.repaginateReport){ return; }
-    requestAnimationFrame(() => window.repaginateReport());
+    let runs = 0;
+    const run = () => {
+      window.repaginateReport();
+      runs += 1;
+      if(runs < 3){ requestAnimationFrame(run); }
+    };
+    requestAnimationFrame(run);
+    setTimeout(() => window.repaginateReport(), 180);
+    setTimeout(() => window.repaginateReport(), 420);
   };
   window.addEventListener('load', () => {
     requestAnimationFrame(paginate);
@@ -1578,25 +1586,12 @@ ROW_IMAGE_JS = r"""
     repaginate();
   }
 
-  function clearImages(rowId){
-    const box = document.querySelector(`[data-row-image-box="${rowId}"]`);
-    if(!box) return;
-    box.innerHTML = '';
-    repaginate();
-  }
-
   document.addEventListener('click', (e) => {
     const addBtn = e.target.closest('[data-row-image-add]');
     if(addBtn){
       const rowId = addBtn.getAttribute('data-row-image-add') || '';
       const input = document.querySelector(`[data-row-image-input="${rowId}"]`);
       if(input){ input.click(); }
-      return;
-    }
-    const removeBtn = e.target.closest('[data-row-image-remove]');
-    if(removeBtn){
-      const rowId = removeBtn.getAttribute('data-row-image-remove') || '';
-      clearImages(rowId);
       return;
     }
     const removeSingle = e.target.closest('.rowCustomImageRemove');
@@ -2080,7 +2075,6 @@ def render_cr(
         image_controls = f"""
           <div class='rowImageTools noPrint'>
             <button class='rowImageBtn' type='button' data-row-image-add='{safe_row_id}'>+ Image</button>
-            <button class='rowImageBtn rowImageBtnDanger' type='button' data-row-image-remove='{safe_row_id}'>Supprimer</button>
             <input class='rowImageInput' type='file' accept='image/*' multiple data-row-image-input='{safe_row_id}' />
           </div>
           <div class='rowCustomImage' data-row-image-box='{safe_row_id}'></div>
@@ -2481,7 +2475,6 @@ body{{padding:14px 14px 14px 280px;}}
 .thumb{{height:90px;width:auto;border:1px solid var(--border);border-radius:8px;display:block}}
 .rowImageTools{{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}}
 .rowImageBtn{{padding:3px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer}}
-.rowImageBtnDanger{{color:#b91c1c;border-color:#fecaca}}
 .rowImageInput{{display:none}}
 .rowCustomImage{{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}}
 .rowCustomImageFrame{{position:relative;display:inline-block;resize:both;overflow:auto;min-width:120px;min-height:80px;max-width:100%;border:1px dashed #94a3b8;border-radius:8px;background:#fff;padding:4px}}
