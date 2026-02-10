@@ -1600,17 +1600,55 @@ PAGINATION_JS = r"""
     document.body.classList.remove('printModeSim');
     window.repaginateReport && window.repaginateReport();
   });
+
+  async function waitForVisualAssets(timeoutMs){
+    const timeout = Number.isFinite(timeoutMs) ? timeoutMs : 3000;
+    const pending = [];
+    if(document.fonts && document.fonts.ready){
+      pending.push(document.fonts.ready.catch(() => {}));
+    }
+    const images = Array.from(document.images || []);
+    images.forEach((img) => {
+      if(!img) return;
+      if(img.complete && img.naturalWidth > 0) return;
+      pending.push(new Promise((resolve) => {
+        let done = false;
+        const finish = () => {
+          if(done) return;
+          done = true;
+          img.removeEventListener('load', finish);
+          img.removeEventListener('error', finish);
+          resolve();
+        };
+        img.addEventListener('load', finish, {once:true});
+        img.addEventListener('error', finish, {once:true});
+        setTimeout(finish, timeout);
+      }));
+    });
+    if(!pending.length) return;
+    await Promise.race([
+      Promise.allSettled(pending),
+      new Promise((resolve) => setTimeout(resolve, timeout)),
+    ]);
+  }
+
   window.exportCurrentPdf = async function(){
     try{
+      await waitForVisualAssets(4500);
       if(window.refreshPagination){
         window.refreshPagination({force:true});
-        await new Promise((resolve) => setTimeout(resolve, 650));
+        await new Promise((resolve) => setTimeout(resolve, 900));
       }
       if(window.repaginateReportForce){
         window.repaginateReportForce();
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       }else if(window.repaginateReport){
         window.repaginateReport(true);
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      }
+      await waitForVisualAssets(2500);
+      if(window.repaginateReportForce){
+        window.repaginateReportForce();
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       }
       const finalHtml = document.documentElement.outerHTML || '';
