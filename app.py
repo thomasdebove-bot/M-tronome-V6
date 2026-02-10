@@ -1592,9 +1592,6 @@ PAGINATION_JS = r"""
   window.repaginateReport = paginate;
   window.refreshPagination = function(options){
     if(!window.repaginateReport){ return; }
-    const forPrint = !!(options && options.forPrint);
-    const body = document.body;
-    if(forPrint && body){ body.classList.add('printModeSim'); }
     let runs = 0;
     const run = () => {
       window.repaginateReport();
@@ -1606,20 +1603,6 @@ PAGINATION_JS = r"""
     setTimeout(() => window.repaginateReport(), 260);
     setTimeout(() => window.repaginateReport(), 480);
   };
-  function repaginateForPrint(){
-    const body = document.body;
-    if(body){ body.classList.add('printModeSim'); }
-    let runs = 0;
-    const run = () => {
-      window.repaginateReport && window.repaginateReport();
-      runs += 1;
-      if(runs < 5){ requestAnimationFrame(run); }
-    };
-    requestAnimationFrame(run);
-    setTimeout(() => window.repaginateReport && window.repaginateReport(), 120);
-    setTimeout(() => window.repaginateReport && window.repaginateReport(), 260);
-    setTimeout(() => window.repaginateReport && window.repaginateReport(), 480);
-  }
   window.addEventListener('load', () => {
     requestAnimationFrame(paginate);
   });
@@ -1628,12 +1611,9 @@ PAGINATION_JS = r"""
     window.__repaginateTimer = setTimeout(paginate, 200);
   });
   window.addEventListener('beforeprint', () => {
-    document.body.classList.add('printCssMode');
-    repaginateForPrint();
+    window.refreshPagination && window.refreshPagination();
   });
   window.addEventListener('afterprint', () => {
-    document.body.classList.remove('printCssMode');
-    document.body.classList.remove('printModeSim');
     window.repaginateReport && window.repaginateReport();
   });
   window.addEventListener('DOMContentLoaded', updatePageNumbers);
@@ -2466,7 +2446,6 @@ body{{padding:14px 14px 14px 280px;}}
 .small{{font-size:12px}}
 .noPrint{{}}
 @media print{{ .noPrint{{display:none!important}} }}
-body.printCssMode .noPrint{{display:none!important}}
 @media print{{body{{padding:0;background:#fff}} .page{{margin:0;box-shadow:none}}}}
 @media screen{{body{{background:#e5e7eb;}} .page{{box-shadow:0 14px 30px rgba(15,23,42,.16)}}}}
 .topPage{{transform:scale(var(--top-scale));transform-origin:top left}}
@@ -2678,7 +2657,7 @@ body.printCssMode .noPrint{{display:none!important}}
 @media print{{
   .printHeaderFixed{{position:static!important;top:auto;left:auto;right:auto;padding:0;z-index:auto;}}
   .page--cover .printHeaderFixed{{display:none!important;}}
-  body.printCssMode .page--report .printHeaderFixed{{position:static!important;top:auto;background:transparent;padding:0;z-index:auto;display:block!important;}}
+  .page--report .printHeaderFixed{{position:static!important;top:auto;background:transparent;padding:0;z-index:auto;display:block!important;}}
 }}
 .reportHeader .accent{{color:#f59e0b;font-weight:900}}
 .presenceTable .presenceList{{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}}
@@ -2699,9 +2678,9 @@ body.printCssMode .noPrint{{display:none!important}}
 @media print{{
   body{{padding:0}}
   .actions,.rangePanel{{display:none!important}}
-  body.printCssMode .reportPages{{display:block}}
-  body.printCssMode .page--report{{break-after:page!important;page-break-after:always!important;}}
-  body.printCssMode .page--report:last-child{{break-after:auto!important;page-break-after:auto!important;}}
+  .reportPages{{display:block}}
+  .page--report{{break-after:page!important;page-break-after:always!important;}}
+  .page--report:last-child{{break-after:auto!important;page-break-after:auto!important;}}
   .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;overflow:hidden;break-after:page;page-break-after:always;}}
   .page:last-child{{break-after:auto;page-break-after:auto;}}
 }}
