@@ -1563,6 +1563,14 @@ PAGINATION_JS = r"""
   });
   window.exportCurrentPdf = async function(){
     try{
+      if(window.refreshPagination){
+        window.refreshPagination();
+        await new Promise((resolve) => setTimeout(resolve, 450));
+      }
+      if(window.repaginateReport){
+        window.repaginateReport();
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      }
       const finalHtml = document.documentElement.outerHTML || '';
       const payload = {
         final_html: finalHtml,
@@ -2909,16 +2917,49 @@ def render_print_html(
     .page:last-child { break-after: auto; page-break-after: auto; }
 
     /* PDF-only global layout controls */
-    body[data-export="weasyprint"] .page { position: relative; overflow: hidden; }
+    body[data-export="weasyprint"] .page {
+      position: relative;
+      overflow: visible;
+    }
     body[data-export="weasyprint"] .page .pageContent {
       padding-bottom: 28mm !important;
       box-sizing: border-box;
     }
     body[data-export="weasyprint"] .page .docFooter {
       position: absolute !important;
-      left: 0; right: 0; bottom: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      justify-content: center !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      overflow: hidden;
+    }
+    body[data-export="weasyprint"] .page .docFooter::before,
+    body[data-export="weasyprint"] .page .docFooter::after {
+      display: block !important;
+    }
+    body[data-export="weasyprint"] .page .footLeft {
+      position: absolute;
+      left: 10mm;
+      bottom: 3mm;
+    }
+    body[data-export="weasyprint"] .page .footCenter {
+      position: relative;
+      left: auto;
+      right: auto;
+      width: 100%;
+      text-align: center;
+      margin: 0 auto;
+      display: block;
     }
     body[data-export="weasyprint"] .page--report .footRight {
+      position: absolute;
+      right: 10mm;
+      bottom: 3mm;
+      min-width: 34mm;
+      text-align: right;
       font-size: 0 !important;
       color: transparent !important;
     }
