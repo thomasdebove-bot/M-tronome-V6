@@ -1288,6 +1288,20 @@ PAGINATION_JS = r"""
     return document.body.classList.contains('printCssMode') || window.matchMedia('print').matches;
   }
 
+  function updatePageNumbers(){
+    const pages = Array.from(document.querySelectorAll('.page'));
+    const total = pages.length;
+    pages.forEach((page, idx) => {
+      const slot = page.querySelector('.footRight');
+      if(!slot) return;
+      if(page.classList.contains('page--cover')){
+        slot.textContent = '';
+        return;
+      }
+      slot.textContent = `${idx + 1}/${total}`;
+    });
+  }
+
   function px(value){
     const n = parseFloat(value || "0");
     return Number.isNaN(n) ? 0 : n;
@@ -1502,6 +1516,7 @@ PAGINATION_JS = r"""
     });
 
     compactPages(container);
+    updatePageNumbers();
   }
 
   window.repaginateReport = paginate;
@@ -1536,6 +1551,7 @@ PAGINATION_JS = r"""
     document.body.classList.remove('printModeSim');
     window.repaginateReport && window.repaginateReport();
   });
+  window.addEventListener('DOMContentLoaded', updatePageNumbers);
 })();
 """
 
@@ -2359,7 +2375,6 @@ body{{padding:14px 14px 14px 280px;}}
 .page{{width:210mm;height:297mm;min-height:297mm;position:relative;background:#fff;overflow:visible;break-after:page;page-break-after:always;}}
 .page:last-child{{break-after:auto;page-break-after:auto;}}
 .page--report{{counter-increment:reportpage;}}
-.page--report::after{{content:"Page " counter(reportpage);position:absolute;bottom:6mm;right:8mm;font-size:10px;color:#ffffff;font-weight:700;}}
 .pageContent{{padding:10mm 8mm 34mm 8mm;}}
 .page--cover .pageContent{{padding-top:0;}}
 .muted{{color:var(--muted)}}
@@ -2587,6 +2602,7 @@ body.printCssMode .noPrint{{display:none!important}}
 .docFooter::before{{content:"";position:absolute;left:0;bottom:0;width:170px;height:42px;background:#123f45;clip-path:polygon(0 100%,100% 100%,0 0)}}
 .docFooter::after{{content:"";position:absolute;right:0;bottom:0;width:260px;height:70px;background:#123f45;clip-path:polygon(100% 0,100% 100%,0 100%)}}
 .footLeft,.footCenter,.footRight{{position:relative;z-index:2}}
+.footRight{{min-width:42mm;text-align:right;color:#ffffff;font-size:10px;font-weight:700;align-self:flex-end;padding-bottom:1mm}}
 .footCenter{{text-align:center;flex:1}}
 .tempoLegal{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:10px;line-height:1.3;color:#6b7280;font-weight:600}}
 .footImg{{display:block;max-height:32px;width:auto}}
@@ -2599,7 +2615,7 @@ body.printCssMode .noPrint{{display:none!important}}
   body.printCssMode .reportPages{{display:block}}
   body.printCssMode .page--report{{height:297mm!important;min-height:297mm!important;overflow:hidden!important;break-after:page!important;page-break-after:always!important;}}
   body.printCssMode .page--report:last-child{{break-after:auto!important;page-break-after:auto!important;}}
-  body.printCssMode .page--report .pageContent{{padding:10mm 8mm 34mm 8mm!important;}}
+  body.printCssMode .page--report .pageContent{{padding:10mm 8mm 24mm 8mm!important;}}
   body.printCssMode .page--report .docFooter{{position:absolute;left:0;right:0;bottom:0;}}
   .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;overflow:hidden;break-after:page;page-break-after:always;}}
   .page:last-child{{break-after:auto;page-break-after:auto;}}
