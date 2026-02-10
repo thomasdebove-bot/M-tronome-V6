@@ -1519,6 +1519,9 @@ PAGINATION_JS = r"""
     clearTimeout(window.__repaginateTimer);
     window.__repaginateTimer = setTimeout(paginate, 200);
   });
+  window.addEventListener('beforeprint', () => {
+    window.refreshPagination && window.refreshPagination();
+  });
 })();
 """
 
@@ -2517,7 +2520,7 @@ body{{padding:14px 14px 14px 280px;}}
 .colGrip{{position:absolute;top:0;right:-6px;width:12px;height:100%;cursor:col-resize}}
 .colGrip::after{{content:"";position:absolute;top:3px;bottom:3px;left:5px;width:2px;background:#cbd5f5;border-radius:2px;opacity:.7}}
 
-@media print{{ .rowToggle{{display:none}} .noPrintRow{{display:none}} .editableCell{{background:transparent}} .rowImageTools{{display:none!important}} }}
+@media print{{ .rowToggle{{display:none}} .noPrintRow{{display:none}} .editableCell{{background:transparent}} .rowImageTools{{display:none!important}} .rowCustomImageFrame{{resize:none!important;border:none!important;padding:0!important;min-width:0!important;min-height:0!important;overflow:hidden!important}} }}
 
 .crTable tr.rowMeeting td{{background:#eef8ff;}}
 .crTable tr.rowMeeting td.colType{{box-shadow:inset 4px 0 0 #2563eb;}}
@@ -2568,7 +2571,7 @@ body{{padding:14px 14px 14px 280px;}}
 .footMark{{max-height:48px}}
 .footRythme{{max-height:28px;margin:6px auto 0 auto}}
 .footTempo{{max-height:28px;margin-left:auto}}
-@media print{{body{{padding:0}} .actions,.rangePanel{{display:none!important}} .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;break-after:page;page-break-after:always;}} .page:last-child{{break-after:auto;page-break-after:auto;}}}}
+@media print{{body{{padding:0}} .actions,.rangePanel{{display:none!important}} .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;overflow:hidden;break-after:page;page-break-after:always;}} .page:last-child{{break-after:auto;page-break-after:auto;}}}}
 
 {EDITOR_MEMO_MODAL_CSS}
 {QUALITY_MODAL_CSS}
