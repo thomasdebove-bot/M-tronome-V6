@@ -2470,8 +2470,6 @@ body{{padding:14px 14px 14px 280px;}}
 .nextMeetingLine1{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:18px}}
 .nextMeetingLine2{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:18px;color:#ef4444;margin-top:5px}}
 .nextMeetingLine3{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:18px;color:#111;margin-top:4px;outline:none}}
-@media print{{.coverHeroImg{{min-height:390px}} .coverProjectTitle{{font-size:44px}} .coverCrTitle{{font-size:33px}} .coverCrMeta{{font-size:36px}} .nextMeetingLine1{{font-size:18px}} .nextMeetingLine2{{font-size:32px}} .nextMeetingLine3{{font-size:27px}}}}
-
 /* PROJECT BANNER */
 .banner{{
   border:1px solid var(--border);
@@ -2487,8 +2485,6 @@ body{{padding:14px 14px 14px 280px;}}
 .bannerMeta{{margin-top:10px;display:flex;flex-wrap:wrap;gap:10px}}
 .bannerChip{{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18);padding:7px 10px;border-radius:999px;font-weight:700;}}
 .bannerDesc{{margin-top:10px;opacity:.95}}
-@media print{{.bannerImg{{min-height:300px}} .bannerTitle{{font-size:22px}} .bannerContent{{padding:14px}}}}
-
 /* BANNER LOGO */
 .bannerLogoWrap{{display:flex;justify-content:flex-start;margin-bottom:8px}}
 .bannerLogo{{height:72px;width:auto;display:block}}
@@ -2501,8 +2497,6 @@ body{{padding:14px 14px 14px 280px;}}
 .kpi_v{{font-weight:1000;font-size:20px;margin-top:6px}}
 .topGrip{{height:8px;width:120px;background:#e2e8f0;border-radius:999px;margin:8px auto 0;cursor:ns-resize}}
 @media (max-width: 980px){{.kpis{{grid-template-columns:repeat(3,1fr)}}}}
-@media print{{.kpis{{grid-template-columns:repeat(4,1fr);gap:6px}} .kpi{{padding:6px}} .kpi_v{{font-size:16px}}}}
-
 /* Sections */
 .section{{margin-top:18px}}
 .sectionTitle{{
@@ -2580,7 +2574,7 @@ body{{padding:14px 14px 14px 280px;}}
 .kpiCount{{font-weight:1000}}
 
 /* PRINT TABLE */
-@page {{ size: A4 portrait; margin: 10mm 8mm 26mm 8mm; }}
+@page {{ size: A4 portrait; margin: 0; }}
 
 .zoneBlock{{margin:0}}
 .zoneBlock + .zoneBlock{{margin-top:0}}
@@ -2654,11 +2648,6 @@ body{{padding:14px 14px 14px 280px;}}
 .coverNote{{margin-top:12px;border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff;line-height:1.5}}
 .coverNoteTitle{{font-weight:1000;margin-bottom:6px}}
 .reportHeader{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:11px;font-weight:400;color:#0b1220;text-align:center;margin:0 0 10px 0;}}
-@media print{{
-  .printHeaderFixed{{position:static!important;top:auto;left:auto;right:auto;padding:0;z-index:auto;}}
-  .page--cover .printHeaderFixed{{display:none!important;}}
-  .page--report .printHeaderFixed{{position:static!important;top:auto;background:transparent;padding:0;z-index:auto;display:block!important;}}
-}}
 .reportHeader .accent{{color:#f59e0b;font-weight:900}}
 .presenceTable .presenceList{{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}}
 .presenceTable .presenceLine{{display:flex;align-items:center;gap:8px;font-weight:700}}
@@ -2676,13 +2665,9 @@ body{{padding:14px 14px 14px 280px;}}
 .footRythme{{max-height:28px;margin:6px auto 0 auto}}
 .footTempo{{max-height:28px;margin-left:auto}}
 @media print{{
-  body{{padding:0}}
+  body{{padding:0;background:#fff}}
   .actions,.rangePanel{{display:none!important}}
-  .reportPages{{display:block}}
-  .page--report{{break-after:page!important;page-break-after:always!important;}}
-  .page--report:last-child{{break-after:auto!important;page-break-after:auto!important;}}
-  .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;overflow:hidden;break-after:page;page-break-after:always;}}
-  .page:last-child{{break-after:auto;page-break-after:auto;}}
+  .page{{margin:0;box-shadow:none;overflow:visible}}
 }}
 
 {EDITOR_MEMO_MODAL_CSS}
