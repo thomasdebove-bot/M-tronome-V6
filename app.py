@@ -1681,6 +1681,38 @@ PAGINATION_JS = r"""
       alert('Erreur export PDF: ' + (err && err.message ? err.message : String(err)));
     }
   };
+  window.exportCurrentWord = async function(){
+    try{
+      const finalHtml = document.documentElement.outerHTML || '';
+      const payload = {
+        final_html: finalHtml,
+        project: (document.getElementById('project')?.value || document.body.dataset.project || '').trim(),
+        filename: 'rapport.doc',
+        meeting_id: (new URLSearchParams(window.location.search).get('meeting_id') || '').trim(),
+      };
+      const res = await fetch('/export/word', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+      if(!res.ok){
+        const txt = await res.text();
+        alert('Erreur export Word: ' + txt);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'rapport.doc';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 8000);
+    }catch(err){
+      alert('Erreur export Word: ' + (err && err.message ? err.message : String(err)));
+    }
+  };
   window.addEventListener('DOMContentLoaded', updatePageNumbers);
 })();
 """
@@ -2157,6 +2189,7 @@ def render_cr(
     actions_html = f"""
       <div class="actions noPrint">
         <button class="btn" type="button" onclick="window.exportCurrentPdf && window.exportCurrentPdf()">Imprimer / PDF</button>
+        <button class="btn secondary" type="button" onclick="window.exportCurrentWord && window.exportCurrentWord()">Exporter Word (.doc)</button>
         <button class="btn secondary editCompact" type="button" onclick="window.refreshPagination && window.refreshPagination()">Recalculer la mise en page</button>
         <button class="btn secondary editCompact" id="btnQualityCheck" type="button">Qualité du texte</button>
         <button class="btn secondary editCompact" id="btnAnalysis" type="button">Analyse</button>
@@ -2977,6 +3010,50 @@ def _extract_styles_from_cr_html(full_html: str) -> str:
     return "\n\n".join(styles).strip()
 
 
+def render_word_html(
+    content_html: str,
+    *,
+    project: str = "",
+    meeting_date: str = "",
+    report_number: str = "",
+    source_css: str = "",
+) -> str:
+    project_txt = _escape(project or "Projet")
+    date_txt = _escape(meeting_date or date.today().strftime("%d/%m/%Y"))
+    report_txt = _escape(report_number or "-")
+    base_css = source_css or ""
+    word_css = """
+    @page { size: A4; margin: 15mm; }
+    html, body { margin: 0; padding: 0; }
+    .actions, .rangePanel, .noPrint, .zoneBtns, .rowImageTools, .rowToggle, .colGrip { display: none !important; }
+    .wrap { max-width: none !important; margin: 0 !important; padding: 0 !important; display: block !important; }
+    .reportPages, .page { display: block !important; width: auto !important; height: auto !important; min-height: 0 !important; overflow: visible !important; break-after: auto !important; page-break-after: auto !important; box-shadow: none !important; }
+    .pageContent { padding: 0 !important; }
+    .docFooter { position: static !important; margin-top: 6mm; }
+    #report-page-template { display: none !important; }
+    """
+    return f"""
+<!doctype html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40"
+      lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="ProgId" content="Word.Document" />
+  <meta name="Generator" content="TEMPO" />
+  <title>{project_txt} - Export Word</title>
+  <style>{base_css}
+
+{word_css}</style>
+</head>
+<body data-export="word" data-project="{project_txt}" data-meeting-date="{date_txt}" data-report-number="{report_txt}">
+  {content_html}
+</body>
+</html>
+"""
+
+
 def render_print_html(
     content_html: str,
     *,
@@ -3256,6 +3333,73 @@ def export_pdf(
         )
     except Exception as exc:
         return JSONResponse({"error": "Internal error during /export/pdf", "detail": str(exc)}, status_code=500)
+
+
+@app.get("/export/word", response_class=Response)
+@app.post("/export/word", response_class=Response)
+def export_word(
+    payload: Optional[ExportPdfPayload] = Body(default=None),
+    meeting_id: Optional[str] = Query(default=None),
+    project: str = Query(default=""),
+):
+    try:
+        source_css = ""
+        payload_meeting_id = (payload.meeting_id or "").strip() if payload else ""
+        effective_meeting_id = (meeting_id or payload_meeting_id).strip()
+
+        if effective_meeting_id:
+            mrow = meeting_row(effective_meeting_id)
+            project_name = (project or str(mrow.get(M_COL_PROJECT_TITLE, ""))).strip()
+            meeting_date_txt = _fmt_date(_parse_date_any(mrow.get(M_COL_DATE)))
+            meetings_df = meetings_for_project(project_name)
+            report_index, report_total = _meeting_sequence_for_project(meetings_df, effective_meeting_id)
+            report_number = f"{report_index}/{report_total}"
+            source_html = render_cr(meeting_id=effective_meeting_id, project=project_name, print_mode=True)
+            source_css = _extract_styles_from_cr_html(source_html)
+            clean_content = _extract_print_content_from_cr_html(source_html)
+            safe_project = re.sub(r"[^A-Za-z0-9_-]+", "_", project_name).strip("_") or "projet"
+            filename = f"CR_{safe_project}_{effective_meeting_id}.doc"
+        elif payload and payload.final_html.strip():
+            project_name = (payload.project or project or "").strip()
+            meeting_date_txt = (payload.meeting_date or "").strip()
+            report_number = (payload.report_number or "").strip()
+            source_html = payload.final_html
+            source_css = _extract_styles_from_cr_html(source_html)
+            clean_content = _extract_print_content_from_cr_html(source_html)
+            filename = (payload.filename or "rapport.doc").strip() or "rapport.doc"
+        elif payload and payload.content_html.strip():
+            project_name = (payload.project or project or "").strip()
+            meeting_date_txt = (payload.meeting_date or "").strip()
+            report_number = (payload.report_number or "").strip()
+            clean_content = payload.content_html.strip()
+            filename = (payload.filename or "rapport.doc").strip() or "rapport.doc"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Fournissez soit payload.content_html, soit meeting_id pour construire le rapport Word.",
+            )
+
+        html = render_word_html(
+            clean_content,
+            project=project_name,
+            meeting_date=meeting_date_txt,
+            report_number=report_number,
+            source_css=source_css,
+        )
+        if not filename.lower().endswith('.doc'):
+            filename = f"{filename}.doc"
+        return Response(
+            content=html.encode('utf-8'),
+            media_type="application/msword",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except MissingDataError as err:
+        return JSONResponse(
+            {"error": str(err), "label": err.label, "path": err.path, "env_var": err.env_var},
+            status_code=503,
+        )
+    except Exception as exc:
+        return JSONResponse({"error": "Internal error during /export/word", "detail": str(exc)}, status_code=500)
 
 
 
