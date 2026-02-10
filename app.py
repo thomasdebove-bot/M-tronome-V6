@@ -31,8 +31,9 @@ from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import Body, FastAPI, HTTPException, Query
+from fastapi.responses import HTMLResponse, JSONResponse, Response
+from pydantic import BaseModel
 
 app = FastAPI(title="TEMPO • CR Synthèse (METRONOME)")
 
@@ -2825,6 +2826,164 @@ body.printCssMode .noPrint{{display:none!important}}
 """
 
 
+class ExportPdfPayload(BaseModel):
+    content_html: str = ""
+    project: str = ""
+    meeting_date: str = ""
+    report_number: str = ""
+    filename: str = "rapport.pdf"
+
+
+def _extract_print_content_from_cr_html(full_html: str) -> str:
+    body_match = re.search(r"<body[^>]*>(.*?)</body>", full_html, flags=re.IGNORECASE | re.DOTALL)
+    content = body_match.group(1) if body_match else full_html
+    content = re.sub(r"<script\b[^>]*>.*?</script>", "", content, flags=re.IGNORECASE | re.DOTALL)
+    content = re.sub(r"<template\b[^>]*>.*?</template>", "", content, flags=re.IGNORECASE | re.DOTALL)
+    content = re.sub(r"<div class=\"actions\"[^>]*>.*?</div>", "", content, flags=re.IGNORECASE | re.DOTALL)
+    content = re.sub(r"<div class=\"rangePanel\"[^>]*>.*?</div>", "", content, flags=re.IGNORECASE | re.DOTALL)
+    return content.strip()
+
+
+def render_print_html(
+    content_html: str,
+    *,
+    project: str = "",
+    meeting_date: str = "",
+    report_number: str = "",
+) -> str:
+    tempo_logo = _logo_data_url(LOGO_TEMPO_PATH)
+    logo_html = (
+        f"<img class='printLogo' src='{tempo_logo}' alt='TEMPO' />" if tempo_logo else "<div class='printLogoFallback'>TEMPO</div>"
+    )
+    project_txt = _escape(project or "Projet")
+    date_txt = _escape(meeting_date or date.today().strftime("%d/%m/%Y"))
+    report_txt = _escape(report_number or "-")
+    return f"""
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>{project_txt} - Export PDF</title>
+  <style>
+    @page {{
+      size: A4 portrait;
+      margin: 24mm 12mm 22mm 12mm;
+      @top-center {{ content: element(page-header); }}
+      @bottom-center {{ content: element(page-footer); }}
+      @bottom-right {{
+        content: "Page " counter(page) " / " counter(pages);
+        color: #0f3a40;
+        font-size: 10pt;
+        font-weight: 700;
+      }}
+    }}
+
+    html, body {{ margin: 0; padding: 0; }}
+    body {{
+      font-family: Arial, "Segoe UI", sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.35;
+      color: #0f172a;
+    }}
+
+    header.printHeader {{
+      position: running(page-header);
+      border-bottom: 1px solid #d1d5db;
+      padding: 4mm 0 3mm 0;
+      display: table;
+      width: 100%;
+      table-layout: fixed;
+    }}
+    .printHeaderLeft, .printHeaderCenter, .printHeaderRight {{ display: table-cell; vertical-align: middle; }}
+    .printHeaderLeft {{ width: 24%; }}
+    .printHeaderCenter {{ width: 52%; text-align: center; font-size: 11pt; }}
+    .printHeaderCenter .accent {{ color: #f59e0b; font-weight: 700; }}
+    .printHeaderRight {{ width: 24%; text-align: right; color: #475569; font-size: 9.5pt; }}
+    .printLogo {{ max-height: 22mm; width: auto; display: block; }}
+    .printLogoFallback {{ font-weight: 800; font-size: 12pt; color: #0f3a40; }}
+
+    footer.printFooter {{
+      position: running(page-footer);
+      border-top: 1px solid #d1d5db;
+      padding-top: 2.5mm;
+      font-size: 8.5pt;
+      color: #475569;
+      text-align: center;
+    }}
+
+    main.printMain {{ margin: 0; padding: 0; }}
+
+    .wrap, .page, .pageContent, .reportPages, .reportTables {{
+      width: auto !important;
+      height: auto !important;
+      min-height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      break-after: auto !important;
+      page-break-after: auto !important;
+    }}
+
+    .page--cover, .actions, .rangePanel, .noPrint, .docFooter, .printHeaderFixed {{ display: none !important; }}
+    .page--report {{ display: block !important; }}
+
+    .reportBlocks {{ display: block !important; }}
+    .zoneBlock {{ margin: 0 0 3mm 0 !important; }}
+    .zoneTitle {{
+      margin: 0;
+      padding: 1.8mm 2.2mm;
+      background: #f59e0b;
+      color: #fff;
+      font-size: 10pt;
+      font-weight: 800;
+    }}
+
+    table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
+    thead {{ display: table-header-group; }}
+    tfoot {{ display: table-footer-group; }}
+    tr, td, th {{ page-break-inside: avoid; }}
+    th, td {{ border: 1px solid #cbd5e1; padding: 2mm 1.8mm; vertical-align: top; font-size: 9.5pt; }}
+    th {{ background: #1f4e4f; color: #fff; text-align: center; font-weight: 800; }}
+
+    .sessionSubRow td.colComment {{ font-weight: 800; color: #0f172a; text-decoration: none; }}
+    .colType {{ font-weight: 800; }}
+    .colDate, .colLot, .colWho {{ text-align: center; white-space: nowrap; }}
+
+    .reportNote {{ margin-top: 5mm; font-size: 9.5pt; }}
+  </style>
+</head>
+<body>
+  <header class="printHeader">
+    <div class="printHeaderLeft">{logo_html}</div>
+    <div class="printHeaderCenter">{project_txt} <span class="accent">— Compte Rendu n° {report_txt}</span></div>
+    <div class="printHeaderRight">Réunion du {date_txt}</div>
+  </header>
+
+  <footer class="printFooter">
+    TEMPO — 35, rue Beaubourg, 75003 Paris — SAS au capital de 1 000 Euros - RCS Créteil N° 892 046 301 - APE 7112 B
+  </footer>
+
+  <main class="printMain">{content_html}</main>
+</body>
+</html>
+"""
+
+
+def _weasy_html_or_raise():
+    try:
+        from weasyprint import HTML  # type: ignore
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "WeasyPrint non disponible. Installez avec `pip install weasyprint`. "
+                "Sous Windows, installez aussi GTK runtime (Pango/Cairo)."
+            ),
+        ) from exc
+    return HTML
+
+
 # -------------------------
 # ROUTES
 # -------------------------
@@ -2858,6 +3017,58 @@ def cr(
         )
     except MissingDataError as err:
         return HTMLResponse(render_missing_data_page(err), status_code=503)
+
+
+@app.get("/export/pdf", response_class=Response)
+@app.post("/export/pdf", response_class=Response)
+def export_pdf(
+    payload: Optional[ExportPdfPayload] = Body(default=None),
+    meeting_id: Optional[str] = Query(default=None),
+    project: str = Query(default=""),
+):
+    try:
+        if payload and payload.content_html.strip():
+            project_name = (payload.project or project or "").strip()
+            meeting_date_txt = (payload.meeting_date or "").strip()
+            report_number = (payload.report_number or "").strip()
+            clean_content = payload.content_html.strip()
+            filename = (payload.filename or "rapport.pdf").strip() or "rapport.pdf"
+        elif meeting_id:
+            mrow = meeting_row(meeting_id)
+            project_name = (project or str(mrow.get(M_COL_PROJECT_TITLE, ""))).strip()
+            meeting_date_txt = _fmt_date(_parse_date_any(mrow.get(M_COL_DATE)))
+            meetings_df = meetings_for_project(project_name)
+            report_index, report_total = _meeting_sequence_for_project(meetings_df, meeting_id)
+            report_number = f"{report_index}/{report_total}"
+            source_html = render_cr(meeting_id=meeting_id, project=project_name, print_mode=True)
+            clean_content = _extract_print_content_from_cr_html(source_html)
+            safe_project = re.sub(r"[^A-Za-z0-9_-]+", "_", project_name).strip("_") or "projet"
+            filename = f"CR_{safe_project}_{meeting_id}.pdf"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Fournissez soit payload.content_html, soit meeting_id pour construire le rapport.",
+            )
+
+        html = render_print_html(
+            clean_content,
+            project=project_name,
+            meeting_date=meeting_date_txt,
+            report_number=report_number,
+        )
+        WeasyHTML = _weasy_html_or_raise()
+        pdf_bytes = WeasyHTML(string=html, base_url=os.getcwd()).write_pdf()
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        )
+    except MissingDataError as err:
+        return JSONResponse(
+            {"error": str(err), "label": err.label, "path": err.path, "env_var": err.env_var},
+            status_code=503,
+        )
+
 
 
 @app.get("/health", response_class=JSONResponse)
