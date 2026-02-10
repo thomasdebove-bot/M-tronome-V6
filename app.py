@@ -1432,10 +1432,25 @@ PAGINATION_JS = r"""
         const candidateHeight = candidate.getBoundingClientRect().height || candidate.offsetHeight || 0;
         const available = calcAvailable(current, i === 0);
         const used = pageUsedHeight(current);
+        const remaining = available - used;
         if(used + candidateHeight <= available){
           currentBlocksWrap.appendChild(candidate);
           moved = true;
           continue;
+        }
+        if(candidate.classList.contains('zoneBlock')){
+          const splitData = getZoneSplitData(candidate);
+          if(splitData.rows.length > 1){
+            const minimumChunk = splitData.titleHeight + splitData.tableOverhead + (splitData.rowHeights[0] || 0);
+            if(remaining > minimumChunk){
+              const {chunk, nextIndex, height: chunkHeight} = buildZoneChunk(candidate, splitData, 0, remaining);
+              if(nextIndex > 0 && nextIndex < splitData.rows.length && used + chunkHeight <= available){
+                currentBlocksWrap.appendChild(chunk);
+                moved = true;
+                continue;
+              }
+            }
+          }
         }
         break;
       }
@@ -2615,12 +2630,14 @@ body.printCssMode .noPrint{{display:none!important}}
 .reportHeader .accent{{color:#f59e0b;font-weight:900}}
 .presenceTable .presenceList{{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}}
 .presenceTable .presenceLine{{display:flex;align-items:center;gap:8px;font-weight:700}}
-.docFooter{{position:absolute;left:0;right:0;bottom:0;height:24mm;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:3mm 10mm;border-top:1px solid #dbe5f0;background:#fff;overflow:hidden;width:100%;box-sizing:border-box}}
+.docFooter{{position:absolute;left:0;right:0;bottom:0;height:24mm;display:flex;align-items:center;justify-content:center;gap:10px;padding:3mm 10mm;border-top:1px solid #dbe5f0;background:#fff;overflow:hidden;width:100%;box-sizing:border-box}}
 .docFooter::before{{content:"";position:absolute;left:0;bottom:0;width:170px;height:42px;background:#123f45;clip-path:polygon(0 100%,100% 100%,0 0)}}
 .docFooter::after{{content:"";position:absolute;right:0;bottom:0;width:260px;height:70px;background:#123f45;clip-path:polygon(100% 0,100% 100%,0 100%)}}
 .footLeft,.footCenter,.footRight{{position:relative;z-index:2}}
-.footRight{{min-width:42mm;text-align:right;color:#ffffff;font-size:10px;font-weight:700;align-self:flex-end;padding-bottom:1mm}}
-.footCenter{{text-align:center;flex:1}}
+.footLeft,.footRight{{flex:0 0 42mm;display:flex;align-items:flex-end}}
+.footLeft{{justify-content:flex-start}}
+.footRight{{justify-content:flex-end;text-align:right;color:#ffffff;font-size:10px;font-weight:700;padding-bottom:1mm}}
+.footCenter{{text-align:center;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:120mm;margin:0 auto}}
 .tempoLegal{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:10px;line-height:1.3;color:#6b7280;font-weight:600}}
 .footImg{{display:block;max-height:32px;width:auto}}
 .footMark{{max-height:48px}}
