@@ -1284,6 +1284,18 @@ LAYOUT_CONTROLS_JS = r"""
 
 PAGINATION_JS = r"""
 (function(){
+  function normalizeReportForPrint(){
+    const container = document.querySelector('.reportPages');
+    const firstPage = container?.querySelector('.page--report');
+    const firstBlocks = firstPage?.querySelector('.reportBlocks');
+    if(!container || !firstPage || !firstBlocks) return;
+    const blocks = Array.from(container.querySelectorAll('.reportBlock'));
+    firstBlocks.innerHTML = '';
+    blocks.forEach(block => firstBlocks.appendChild(block));
+    const pages = Array.from(container.querySelectorAll('.page--report'));
+    pages.slice(1).forEach(p => p.remove());
+  }
+
   function px(value){
     const n = parseFloat(value || "0");
     return Number.isNaN(n) ? 0 : n;
@@ -1432,6 +1444,7 @@ PAGINATION_JS = r"""
   }
 
   function paginate(){
+    if(document.body.classList.contains('printNativeMode')) return;
     const container = document.querySelector('.reportPages');
     const firstPage = container?.querySelector('.page--report');
     if(!container || !firstPage) return;
@@ -1503,8 +1516,11 @@ PAGINATION_JS = r"""
   window.refreshPagination = function(options){
     if(!window.repaginateReport){ return; }
     const forPrint = !!(options && options.forPrint);
-    const body = document.body;
-    if(forPrint && body){ body.classList.add('printModeSim'); }
+    if(forPrint){
+      document.body.classList.add('printNativeMode');
+      normalizeReportForPrint();
+      return;
+    }
     let runs = 0;
     const run = () => {
       window.repaginateReport();
@@ -1527,7 +1543,7 @@ PAGINATION_JS = r"""
     window.refreshPagination && window.refreshPagination({forPrint:true});
   });
   window.addEventListener('afterprint', () => {
-    document.body.classList.remove('printModeSim');
+    document.body.classList.remove('printNativeMode');
     window.repaginateReport && window.repaginateReport();
   });
 })();
@@ -2359,7 +2375,6 @@ body{{padding:14px 14px 14px 280px;}}
 .muted{{color:var(--muted)}}
 .small{{font-size:12px}}
 .noPrint{{}}
-.printModeSim .noPrint{{display:none!important}}
 @media print{{ .noPrint{{display:none!important}} }}
 @media print{{body{{padding:0;background:#fff}} .page{{margin:0;box-shadow:none}}}}
 @media screen{{body{{background:#e5e7eb;}} .page{{box-shadow:0 14px 30px rgba(15,23,42,.16)}}}}
@@ -2495,7 +2510,7 @@ body{{padding:14px 14px 14px 280px;}}
 .kpiCount{{font-weight:1000}}
 
 /* PRINT TABLE */
-@page {{ size: A4 portrait; margin: 0; }}
+@page {{ size: A4 portrait; margin: 10mm 8mm 26mm 8mm; }}
 
 .zoneBlock{{margin:0}}
 .zoneBlock + .zoneBlock{{margin-top:0}}
@@ -2508,6 +2523,9 @@ body{{padding:14px 14px 14px 280px;}}
 .crTable th, .crTable td{{border:1px solid var(--border);padding:7px 8px;vertical-align:top;page-break-inside:avoid;break-inside:avoid;}}
 .crTable tr{{page-break-inside:avoid;break-inside:avoid;}}
 .annexTable tr{{page-break-inside:avoid;break-inside:avoid;}}
+.zoneBlock{{break-inside:avoid-page;page-break-inside:avoid;}}
+.zoneTitle{{break-after:avoid-page;page-break-after:avoid;}}
+.sessionSubRow{{break-after:avoid-page;page-break-after:avoid;}}
 .crTable th{{background:#1f4e4f;color:#fff;text-align:center;font-weight:900;font-size:11px;line-height:1.2;white-space:nowrap}}
 .crTable td{{font-size:11px;line-height:1.3;word-break:normal;overflow-wrap:break-word;hyphens:none}}
 .crTable td.colDate, .crTable th.colDate{{padding:6px 4px}}
@@ -2566,7 +2584,9 @@ body{{padding:14px 14px 14px 280px;}}
 .coverNote{{margin-top:12px;border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff;line-height:1.5}}
 .coverNoteTitle{{font-weight:1000;margin-bottom:6px}}
 .reportHeader{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:11px;font-weight:400;color:#0b1220;text-align:center;margin:0 0 10px 0;}}
-@media print{{.printHeaderFixed{{position:sticky;top:0;background:#fff;padding:1mm 0;z-index:20;}}}}
+@media print{{
+  body.printNativeMode .printHeaderFixed{{position:fixed;top:10mm;left:8mm;right:8mm;background:#fff;padding:1mm 0;z-index:30;}}
+}}
 .reportHeader .accent{{color:#f59e0b;font-weight:900}}
 .presenceTable .presenceList{{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}}
 .presenceTable .presenceLine{{display:flex;align-items:center;gap:8px;font-weight:700}}
@@ -2580,7 +2600,17 @@ body{{padding:14px 14px 14px 280px;}}
 .footMark{{max-height:48px}}
 .footRythme{{max-height:28px;margin:6px auto 0 auto}}
 .footTempo{{max-height:28px;margin-left:auto}}
-@media print{{body{{padding:0}} .actions,.rangePanel{{display:none!important}} .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;overflow:hidden;break-after:page;page-break-after:always;}} .page:last-child{{break-after:auto;page-break-after:auto;}}}}
+@media print{{
+  body{{padding:0}}
+  .actions,.rangePanel{{display:none!important}}
+  body.printNativeMode .reportPages{{display:block}}
+  body.printNativeMode .reportPages .page--report{{width:auto;height:auto;min-height:0;margin:0;box-shadow:none;overflow:visible;break-after:auto;page-break-after:auto;}}
+  body.printNativeMode .reportPages .page--report + .page--report{{display:none!important}}
+  body.printNativeMode .reportPages .page--report .pageContent{{padding-top:18mm;padding-bottom:30mm;}}
+  body.printNativeMode .reportPages .page--report .docFooter{{position:fixed;left:8mm;right:8mm;bottom:10mm;}}
+  .page{{width:210mm;min-height:297mm;margin:0;box-shadow:none;overflow:hidden;break-after:page;page-break-after:always;}}
+  .page:last-child{{break-after:auto;page-break-after:auto;}}
+}}
 
 {EDITOR_MEMO_MODAL_CSS}
 {QUALITY_MODAL_CSS}
