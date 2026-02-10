@@ -2215,7 +2215,7 @@ body{{padding:14px 14px 14px 280px;}}
 .page{{width:210mm;height:297mm;min-height:297mm;position:relative;background:#fff;overflow:visible;break-after:page;page-break-after:always;}}
 .page:last-child{{break-after:auto;page-break-after:auto;}}
 .page--report{{counter-increment:reportpage;}}
-.page--report::after{{content:"Page " counter(reportpage);position:absolute;bottom:6mm;right:8mm;font-size:10px;color:#1f2937;font-weight:700;}}
+.page--report::after{{content:"Page " counter(reportpage);position:absolute;bottom:6mm;right:8mm;font-size:10px;color:#ffffff;font-weight:700;}}
 .pageContent{{padding:10mm 8mm 34mm 8mm;}}
 .page--cover .pageContent{{padding-top:0;}}
 .muted{{color:var(--muted)}}
@@ -2234,8 +2234,8 @@ body{{padding:14px 14px 14px 280px;}}
 .coverHeroLogoWrap{{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:4;background:#fff;padding:10px 18px;border-radius:8px;box-shadow:0 6px 18px rgba(2,6,23,.12)}}
 .coverHeroLogo{{height:110px;width:auto;display:block}}
 .coverNoteCenter{{text-align:center;padding:10px 16px 12px 16px;font-weight:900;display:flex;flex-direction:column;align-items:center;gap:10px}}
-.coverAppNote{{margin-top:8px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:14px;line-height:1.45;color:#f97316;font-style:italic;font-weight:600;max-width:640px}}
-.coverUrl{{margin-top:6px;font-weight:900;color:#f97316;text-decoration:underline;text-underline-offset:3px}}
+.coverAppNote{{margin-top:22px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:14px;line-height:1.45;color:#f97316;font-style:italic;font-weight:600;max-width:640px}}
+.coverUrl{{margin-top:12px;font-weight:900;color:#f97316;text-decoration:underline;text-underline-offset:3px}}
 .coverUrl::after{{content:" ↗";font-weight:900}}
 .coverProjectTitle{{font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#f59e0b;font-weight:700;letter-spacing:.5px;text-transform:uppercase}}
 .coverCrTitle{{margin-top:10px;font-family:"Arial Nova Cond Light","Arial Narrow",Arial,sans-serif;font-size:22px;line-height:1.2;color:#0f3a40;font-weight:700}}
