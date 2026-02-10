@@ -1291,14 +1291,12 @@ PAGINATION_JS = r"""
 
   function calcAvailable(page, includePresence){
     const pageContent = page.querySelector('.pageContent');
-    const footer = page.querySelector('.docFooter');
     const header = page.querySelector('.reportHeader');
     const presence = page.querySelector('.presenceWrap');
     const pageRect = page.getBoundingClientRect();
     if(!pageContent) return pageRect.height;
     const styles = window.getComputedStyle(pageContent);
     let available = pageRect.height - px(styles.paddingTop) - px(styles.paddingBottom);
-    if(footer){ available -= footer.getBoundingClientRect().height; }
     if(header){ available -= header.getBoundingClientRect().height; }
     if(includePresence && presence){ available -= presence.getBoundingClientRect().height; }
     return available;
