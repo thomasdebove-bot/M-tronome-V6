@@ -1500,17 +1500,21 @@ PAGINATION_JS = r"""
   }
 
   window.repaginateReport = paginate;
-  window.refreshPagination = function(){
+  window.refreshPagination = function(options){
     if(!window.repaginateReport){ return; }
+    const forPrint = !!(options && options.forPrint);
+    const body = document.body;
+    if(forPrint && body){ body.classList.add('printModeSim'); }
     let runs = 0;
     const run = () => {
       window.repaginateReport();
       runs += 1;
-      if(runs < 3){ requestAnimationFrame(run); }
+      if(runs < 5){ requestAnimationFrame(run); }
     };
     requestAnimationFrame(run);
-    setTimeout(() => window.repaginateReport(), 180);
-    setTimeout(() => window.repaginateReport(), 420);
+    setTimeout(() => window.repaginateReport(), 120);
+    setTimeout(() => window.repaginateReport(), 260);
+    setTimeout(() => window.repaginateReport(), 480);
   };
   window.addEventListener('load', () => {
     requestAnimationFrame(paginate);
@@ -1520,7 +1524,11 @@ PAGINATION_JS = r"""
     window.__repaginateTimer = setTimeout(paginate, 200);
   });
   window.addEventListener('beforeprint', () => {
-    window.refreshPagination && window.refreshPagination();
+    window.refreshPagination && window.refreshPagination({forPrint:true});
+  });
+  window.addEventListener('afterprint', () => {
+    document.body.classList.remove('printModeSim');
+    window.repaginateReport && window.repaginateReport();
   });
 })();
 """
@@ -2351,6 +2359,7 @@ body{{padding:14px 14px 14px 280px;}}
 .muted{{color:var(--muted)}}
 .small{{font-size:12px}}
 .noPrint{{}}
+.printModeSim .noPrint{{display:none!important}}
 @media print{{ .noPrint{{display:none!important}} }}
 @media print{{body{{padding:0;background:#fff}} .page{{margin:0;box-shadow:none}}}}
 @media screen{{body{{background:#e5e7eb;}} .page{{box-shadow:0 14px 30px rgba(15,23,42,.16)}}}}
