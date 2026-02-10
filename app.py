@@ -1284,10 +1284,6 @@ LAYOUT_CONTROLS_JS = r"""
 
 PAGINATION_JS = r"""
 (function(){
-  function isPrintMode(){
-    return document.body.classList.contains('printCssMode') || window.matchMedia('print').matches;
-  }
-
   function updatePageNumbers(){
     const pages = Array.from(document.querySelectorAll('.page'));
     const total = pages.length;
@@ -1457,7 +1453,6 @@ PAGINATION_JS = r"""
   }
 
   function paginate(){
-    if(isPrintMode()) return;
     const container = document.querySelector('.reportPages');
     const firstPage = container?.querySelector('.page--report');
     if(!container || !firstPage) return;
@@ -1543,6 +1538,20 @@ PAGINATION_JS = r"""
     setTimeout(() => window.repaginateReport(), 260);
     setTimeout(() => window.repaginateReport(), 480);
   };
+  function repaginateForPrint(){
+    const body = document.body;
+    if(body){ body.classList.add('printModeSim'); }
+    let runs = 0;
+    const run = () => {
+      window.repaginateReport && window.repaginateReport();
+      runs += 1;
+      if(runs < 5){ requestAnimationFrame(run); }
+    };
+    requestAnimationFrame(run);
+    setTimeout(() => window.repaginateReport && window.repaginateReport(), 120);
+    setTimeout(() => window.repaginateReport && window.repaginateReport(), 260);
+    setTimeout(() => window.repaginateReport && window.repaginateReport(), 480);
+  }
   window.addEventListener('load', () => {
     requestAnimationFrame(paginate);
   });
@@ -1552,6 +1561,7 @@ PAGINATION_JS = r"""
   });
   window.addEventListener('beforeprint', () => {
     document.body.classList.add('printCssMode');
+    repaginateForPrint();
   });
   window.addEventListener('afterprint', () => {
     document.body.classList.remove('printCssMode');
