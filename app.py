@@ -1556,28 +1556,29 @@ ROW_IMAGE_JS = r"""
     if(window.repaginateReport){ window.repaginateReport(); }
   }
 
-  function bindImageResize(img){
-    if(!img) return;
-    img.addEventListener('load', repaginate, {once:true});
-    img.addEventListener('mouseup', repaginate);
-    img.addEventListener('touchend', repaginate);
+  function bindFrameResize(frame){
+    if(!frame) return;
+    frame.addEventListener('mouseup', repaginate);
+    frame.addEventListener('touchend', repaginate);
   }
 
-  function setImage(rowId, src){
+  function addImage(rowId, src){
     const box = document.querySelector(`[data-row-image-box="${rowId}"]`);
     if(!box) return;
-    box.innerHTML = `<div class="rowCustomImageFrame"><img class="rowCustomImageEl" src="${src}" alt="Image ajoutée" /></div>`;
-    const img = box.querySelector('img');
-    const frame = box.querySelector('.rowCustomImageFrame');
-    bindImageResize(img);
-    if(frame){
-      frame.addEventListener('mouseup', repaginate);
-      frame.addEventListener('touchend', repaginate);
-    }
+    const frame = document.createElement('div');
+    frame.className = 'rowCustomImageFrame';
+    frame.innerHTML = `
+      <button class="rowCustomImageRemove noPrint" type="button" title="Retirer l'image">×</button>
+      <img class="rowCustomImageEl" src="${src}" alt="Image ajoutée" />
+    `;
+    box.appendChild(frame);
+    bindFrameResize(frame);
+    const img = frame.querySelector('img');
+    if(img){ img.addEventListener('load', repaginate, {once:true}); }
     repaginate();
   }
 
-  function clearImage(rowId){
+  function clearImages(rowId){
     const box = document.querySelector(`[data-row-image-box="${rowId}"]`);
     if(!box) return;
     box.innerHTML = '';
@@ -1595,18 +1596,28 @@ ROW_IMAGE_JS = r"""
     const removeBtn = e.target.closest('[data-row-image-remove]');
     if(removeBtn){
       const rowId = removeBtn.getAttribute('data-row-image-remove') || '';
-      clearImage(rowId);
+      clearImages(rowId);
+      return;
+    }
+    const removeSingle = e.target.closest('.rowCustomImageRemove');
+    if(removeSingle){
+      const frame = removeSingle.closest('.rowCustomImageFrame');
+      if(frame){
+        frame.remove();
+        repaginate();
+      }
     }
   });
 
   document.addEventListener('change', (e) => {
     const input = e.target.closest('[data-row-image-input]');
-    if(!input || !input.files || !input.files[0]) return;
+    if(!input || !input.files || !input.files.length) return;
     const rowId = input.getAttribute('data-row-image-input') || '';
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = () => setImage(rowId, String(reader.result || ''));
-    reader.readAsDataURL(file);
+    Array.from(input.files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => addImage(rowId, String(reader.result || ''));
+      reader.readAsDataURL(file);
+    });
     input.value = '';
   });
 })();
@@ -2070,7 +2081,7 @@ def render_cr(
           <div class='rowImageTools noPrint'>
             <button class='rowImageBtn' type='button' data-row-image-add='{safe_row_id}'>+ Image</button>
             <button class='rowImageBtn rowImageBtnDanger' type='button' data-row-image-remove='{safe_row_id}'>Supprimer</button>
-            <input class='rowImageInput' type='file' accept='image/*' data-row-image-input='{safe_row_id}' />
+            <input class='rowImageInput' type='file' accept='image/*' multiple data-row-image-input='{safe_row_id}' />
           </div>
           <div class='rowCustomImage' data-row-image-box='{safe_row_id}'></div>
         """
@@ -2472,9 +2483,10 @@ body{{padding:14px 14px 14px 280px;}}
 .rowImageBtn{{padding:3px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer}}
 .rowImageBtnDanger{{color:#b91c1c;border-color:#fecaca}}
 .rowImageInput{{display:none}}
-.rowCustomImage{{margin-top:8px}}
-.rowCustomImageFrame{{display:inline-block;resize:both;overflow:auto;min-width:120px;min-height:80px;max-width:100%;border:1px dashed #94a3b8;border-radius:8px;background:#fff;padding:4px}}
+.rowCustomImage{{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}}
+.rowCustomImageFrame{{position:relative;display:inline-block;resize:both;overflow:auto;min-width:120px;min-height:80px;max-width:100%;border:1px dashed #94a3b8;border-radius:8px;background:#fff;padding:4px}}
 .rowCustomImageEl{{display:block;width:100%;height:100%;min-width:110px;min-height:70px;object-fit:contain;border-radius:6px}}
+.rowCustomImageRemove{{position:absolute;top:4px;right:4px;width:20px;height:20px;border:none;border-radius:999px;background:#111827;color:#fff;font-size:14px;line-height:20px;cursor:pointer;opacity:.88}}
 .entryComment{{margin-top:8px;padding-left:12px;border-left:3px solid #e2e8f0}}
 .tagReminderGreen{{color:#16a34a;font-weight:900}}
 .thumbA{{display:inline-flex}}
